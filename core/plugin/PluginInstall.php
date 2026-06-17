@@ -98,7 +98,7 @@ class PluginInstall
     /**
      * 输出日志（CLI 模式 echo，在线模式通过回调）
      */
-    protected function log(string $message, int $progress = null): void
+    protected function log(string $message, ?int $progress = null): void
     {
         if ($this->isOnlineMode && $this->progressCallback) {
             // 在线模式：通过回调返回进度
