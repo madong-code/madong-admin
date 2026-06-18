@@ -139,7 +139,7 @@ class Crud extends Base
             $id   = $request->route->param('id');
             $data = $this->service->get($id);
             if (empty($data)) {
-                throw new AdminException('数据未找到', 400);
+                throw new AdminException('数据未找到', ['errorCode' => 400]);
             }
             return Json::success('ok', $data->toArray());
         } catch (\Throwable $e) {

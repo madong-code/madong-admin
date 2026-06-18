@@ -43,7 +43,7 @@ class RoleMenuService extends BaseService
 //                $roleId         = $data['role_id'] ?? '';
 //                $newPermissions = $data['menu_id'] ?? [];
 //                if (empty($roleId)) {
-//                    throw new AdminException('参数错误缺少role_id', -1);
+//                    throw new AdminException('参数错误缺少role_id', ['errorCode' => -1]);
 //                }
 //
 //                // 1. 获取角色模型（确保角色存在）
@@ -51,7 +51,7 @@ class RoleMenuService extends BaseService
 //                $roleService = Container::make(SysRoleService::class);
 //                $roleModel   = $roleService->get($roleId);
 //                if (!$roleModel) {
-//                    throw new AdminException('角色不存在', -1);
+//                    throw new AdminException('角色不存在', ['errorCode' => -1]);
 //                }
 //
 //                // 2. 同步 role_menu 关联关系（自动处理新增/删除，无需手动计算差异）

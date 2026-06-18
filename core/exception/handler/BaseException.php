@@ -73,12 +73,12 @@ class BaseException extends \Exception
         $errorMessage       = __($errorMessage ?: $this->errorMessage);// 翻译错误信息
         $this->errorMessage = $errorMessage;
         $this->error        = $error;
-        parent::__construct($errorMessage);
         if (!empty($params)) {
             $this->statusCode = $params['statusCode'] ?? $this->statusCode;
             $this->header     = array_merge($this->header, $params['header'] ?? []);
             $this->errorCode  = $params['errorCode'] ?? $this->errorCode;
             $this->data       = $params['data'] ?? $this->data;
         }
+        parent::__construct($errorMessage, $this->errorCode);
     }
 }

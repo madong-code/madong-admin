@@ -154,7 +154,7 @@ final class FilesController extends Crud
             $id   = $request->route->param('id');
             $data = $this->service->get($id);
             if (empty($data)) {
-                throw new AdminException('数据未找到', -1);
+                throw new AdminException('数据未找到', ['errorCode' => -1]);
             }
             return response()->download($data->path, $data->filename);
         } catch (\Throwable $e) {
@@ -184,7 +184,7 @@ final class FilesController extends Crud
             $hash = $request->route->param('hash');
             $data = $this->service->get(['hash' => $hash]);
             if (empty($data)) {
-                throw new AdminException('数据未找到', -1);
+                throw new AdminException('数据未找到', ['errorCode' => -1]);
             }
             return response()->download($data->path, $data->filename);
         } catch (\Throwable $e) {

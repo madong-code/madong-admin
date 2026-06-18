@@ -88,7 +88,7 @@ final class PointsController extends Crud
             $id   = $request->route->param('id');
             $data = $this->service->get($id, ['*'], ['member'], 'created_at', []);
             if (empty($data)) {
-                throw new AdminException('数据未找到', 400);
+                throw new AdminException('数据未找到', ['errorCode' => 400]);
             }
             return Json::success('ok', $data->toArray());
         } catch (\Throwable $e) {
