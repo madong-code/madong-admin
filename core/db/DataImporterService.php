@@ -248,7 +248,7 @@ class DataImporterService
      *
      * @throws \Exception
      */
-    public function installDatabaseTables(\PDO $pdo, array $tablesToInstall, string $database, bool $overwrite = false, string $tablePrefix = '', string $sqlFilePath = null): void
+    public function installDatabaseTables(\PDO $pdo, array $tablesToInstall, string $database, bool $overwrite = false, string $tablePrefix = '', ?string $sqlFilePath = null): void
     {
         // 设置默认SQL文件路径
         if ($sqlFilePath === null) {
