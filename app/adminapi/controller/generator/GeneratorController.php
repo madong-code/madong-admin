@@ -175,7 +175,7 @@ final class GeneratorController extends Crud
             $service = Container::make(GeneratorTableService::class);
             $data    = $service->getDetail($id);
             if (empty($data)) {
-                throw new AdminException('数据未找到', 400);
+                throw new AdminException('数据未找到', ['errorCode' => 400]);
             }
             return Json::success('ok', $data->toArray());
         } catch (\Throwable $e) {

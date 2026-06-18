@@ -54,14 +54,14 @@ class MemberTagPermissionService extends BaseService
             $tagId          = $data['tag_id'] ?? '';
             $newPermissions = $data['menu_id'] ?? [];
             if (empty($tagId)) {
-                throw new AdminException('参数错误缺少tag_id', -1);
+                throw new AdminException('参数错误缺少tag_id', ['errorCode' => -1]);
             }
             // 1. 获取会员标签模型（确保会员标签存在）
             /** @var MemberTagService $tagService */
             $tagService = Container::make(MemberTagService::class);
             $tagModel   = $tagService->get($tagId, ['*'], ['permissions']);
             if (!$tagModel) {
-                throw new AdminException('会员标签不存在', -1);
+                throw new AdminException('会员标签不存在', ['errorCode' => -1]);
             }
             $tagModel->permissions()->sync($newPermissions);
 

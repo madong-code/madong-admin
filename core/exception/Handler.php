@@ -170,8 +170,8 @@ class Handler extends ExceptionHandler
         $bodyValue    = array_values($this->config['body']);
         
         // 当HTTP状态码为错误状态时，确保code不为0
-        $code = $bodyValue[0] ?? 0;
-        if ($this->statusCode >= 400 && $code === 0) {
+        $code = $this->errorCode ?: ($bodyValue[0] ?? 0);
+        if (($this->statusCode >= 400 || $this->statusCode < 100) && $code === 0) {
             $code = -1;
         }
         

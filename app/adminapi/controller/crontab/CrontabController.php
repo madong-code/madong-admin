@@ -79,7 +79,7 @@ final class CrontabController extends Crud
             $id   = $request->route->param('id');
             $data = $this->service->get($id);
             if (empty($data)) {
-                throw new AdminException('数据未找到', 400);
+                throw new AdminException('数据未找到', ['errorCode' => 400]);
             }
 
             $dataArray = $data->toArray();

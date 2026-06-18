@@ -28,4 +28,9 @@ class AdminException extends BaseException
      */
     public int $statusCode = -1;
 
+    /**
+     * @var int
+     */
+    public int $errorCode = -1;
+
 }

@@ -105,7 +105,7 @@ class MenuDao extends BaseDao
                 }
             }
         } catch (\Throwable $e) {
-            throw new CommonException($e->getMessage(), $e->getCode());
+            throw new CommonException($e->getMessage(), ['errorCode' => $e->getCode() ?: -1]);
         }
     }
 

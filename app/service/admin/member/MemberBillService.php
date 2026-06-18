@@ -64,7 +64,7 @@ class MemberBillService extends BaseService
             $this->dao->getModel()->getConnection()->commit();
             return $bill->toArray();
         } catch (\Exception $e) {
-            throw new AdminException($e->getMessage(), [], $e->getCode());
+            throw new AdminException($e->getMessage(), ['errorCode' => $e->getCode() ?: -1]);
         }
     }
 
