@@ -44,51 +44,32 @@ class MenuService extends BaseService
      */
     public function getNavigationList(): array
     {
-        // 使用 remember 模式缓存所有菜单
-        $cacheKey = self::CACHE_PREFIX . '_all';
-//        $allMenus = $this->cacheDriver()->remember($cacheKey, function () {
-//            $map = [
-//                ['enabled', 'eq', EnabledStatus::ENABLED->value],
-//                ['is_show', 'eq', 1],
-//            ];
-//            $menus = $this->dao->selectList($map, ['*'], 0, 0, 'sort asc, id asc');
-//            return $menus->toArray();
-//        }, self::CACHE_EXPIRE);
-        $map   = [
+        $map = [
             ['enabled', 'eq', EnabledStatus::ENABLED->value],
             ['is_show', 'eq', 1],
         ];
-        $menus = $this->dao->selectList($map, ['*'], 0, 0, 'sort asc, id asc');
-        $menus = $menus->toArray();
+        $allMenus = $this->dao->selectList($map, ['*'], 0, 0, 'sort asc, id asc');
+        $allMenus = $allMenus->toArray();
 
-        // 解析 extra 扩展字段
-        return $this->parseExtra($menus);
-
-        // 获取当前用户权限码
         $userPermissions = $this->getUserPermissions();
         $isLogin         = !empty($userPermissions);
 
-        // 根据权限过滤菜单
         $filteredMenus = [];
         foreach ($allMenus as $menu) {
             $code = $menu['code'] ?? '';
-            // code为空表示公开菜单，所有用户可见
             if (empty($code)) {
                 $filteredMenus[] = $menu;
                 continue;
             }
-            // code不为空，需要权限
-            // 未登录用户不显示需要权限的菜单
             if (!$isLogin) {
                 continue;
             }
-            // 登录用户检查是否在权限列表中
             if (in_array($code, $userPermissions, true)) {
                 $filteredMenus[] = $menu;
             }
         }
 
-        return $filteredMenus;
+        return $this->parseExtra($filteredMenus);
     }
 
     /**
