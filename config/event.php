@@ -30,4 +30,8 @@ return [
         [\app\adminapi\listener\ReviewCreatedListener::class, 'handle'],
     ],
 
+    // 会员信息拉取事件（注入标签权限码）
+    'member.info.fetched' => [
+        [\app\api\listener\MemberTagPermissionListener::class, 'handle'],
+    ],
 ];
