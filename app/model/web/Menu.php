@@ -66,6 +66,7 @@ class Menu extends BaseModel
         'id'     => 'string',
         'pid'    => 'string',
         'extra'  => 'json',
+        'category'=>'int'
     ];
 
     /**
