@@ -43,7 +43,7 @@ final class ApiAccessTokenMiddleware implements MiddlewareInterface
         $action          = $request->action;
 
         $skipAuth = AnnotationHelper::getMethodAnnotation($controllerClass, $action, AllowAnonymous::class);
-        if ($skipAuth && $skipAuth->skipToken) {
+        if ($skipAuth && !$skipAuth->shouldRequireToken()) {
             return $handler($request);
         }
 
