@@ -204,6 +204,56 @@ final class InstallService
     }
 
     /**
+     * 测试 Redis 连接
+     *
+     * @param array $config Redis 配置（host, port, password）
+     *
+     * @return array
+     * @throws Exception
+     */
+    public function testRedisConnection(array $config): array
+    {
+        try {
+            $host     = $config['host'] ?? '127.0.0.1';
+            $port     = (int)($config['port'] ?? 6379);
+            $password = $config['password'] ?? '';
+            $timeout  = 3.0;
+
+            if (!extension_loaded('redis')) {
+                throw new Exception('Redis 扩展未安装');
+            }
+
+            $redis = new \Redis();
+            if (!$redis->connect($host, $port, $timeout)) {
+                throw new Exception('无法连接到 Redis 服务器');
+            }
+
+            // 密码认证
+            if (!empty($password)) {
+                if (!$redis->auth($password)) {
+                    throw new Exception('Redis 密码认证失败');
+                }
+            }
+
+            // 执行 ping 验证连接可用
+            // phpredis 不同版本返回值不同：高版本返回 true，低版本返回 '+PONG'
+            $pong = $redis->ping();
+            if ($pong !== true && stripos((string)$pong, 'PONG') === false) {
+                throw new Exception('Redis PING 测试失败');
+            }
+
+            $redis->close();
+
+            return [
+                'connected' => true,
+                'message'   => 'Redis 连接成功',
+            ];
+        } catch (Exception $e) {
+            throw new Exception('Redis 连接失败: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * 安装-SSE模式
      * 
      * 流程：1.验证安装状态 -> 2.环境检测 -> 3.数据库配置 -> 4.参数配置 -> 5.执行安装 -> 6.创建.env(最后)
@@ -246,11 +296,22 @@ final class InstallService
                 throw new Exception('安装参数验证失败: ' . implode(', ', $errors));
             }
 
+            // 提取 Redis 配置参数
+            $redisParams = [
+                'host'     => $params['redis_host'] ?? '127.0.0.1',
+                'port'     => $params['redis_port'] ?? '6379',
+                'password' => $params['redis_password'] ?? '',
+            ];
+
             // 测试数据库连接 (25-30%)
-            yield Sse::progress('> 测试数据库连接', 28, [], $sessionUuid);
+            yield Sse::progress('> 测试数据库连接', 26, [], $sessionUuid);
             $this->testDatabaseConnection($dbParams);
 
-            // 5. 执行安装 (30-60%)
+            // 测试 Redis 连接 (30-33%)
+            yield Sse::progress('> 测试 Redis 连接', 30, [], $sessionUuid);
+            $this->testRedisConnection($redisParams);
+
+            // 5. 执行安装 (33-63%)
             if ($params['install_database'] == 1) {
                 yield Sse::progress('> 5/6 执行数据库安装', 30, [], $sessionUuid);
                 yield from $this->installDatabaseTables($dbParams, $adminParams, $sessionUuid);
@@ -272,8 +333,10 @@ final class InstallService
             $this->createInstallLock();
             
             // 6. 创建 .env 文件 (90-99%)
-            yield Sse::progress('> 6/6 创建.env配置文件', 95, [], $sessionUuid);
-            $this->copyDatabaseTemplateAndCreateEnv($dbParams);
+            yield Sse::progress('> 6/6 创建.env配置文件', 93, [], $sessionUuid);
+            yield Sse::progress('> 写入数据库配置', 94, [], $sessionUuid);
+            yield Sse::progress('> 写入 Redis 配置', 95, [], $sessionUuid);
+            $this->copyDatabaseTemplateAndCreateEnv($dbParams, $redisParams);
 
             // 完成安装 (100%)
            yield Sse::completed('安装完成', [], $sessionUuid);
@@ -1360,10 +1423,13 @@ final class InstallService
     /**
      * 配置数据库连接用于迁移（使用 .env 文件）
      * 
-     * 保存数据库配置到 .env 文件
-     * 用于数据库测试成功后，为后续安装步骤配置数据库连接
+     * 保存数据库和 Redis 配置到 .env 文件
+     * 用于测试成功后，为后续安装步骤准备配置
+     *
+     * @param array $dbParams    数据库参数
+     * @param array $redisParams Redis 参数（可选）
      */
-    public function saveDatabaseConfig(array $dbParams): void
+    public function saveDatabaseConfig(array $dbParams, array $redisParams = []): void
     {
         $envFile = base_path('.env');
         $envTemplateFile = base_path('.example.env');
@@ -1391,6 +1457,11 @@ final class InstallService
 
         foreach ($patterns as $pattern => $replacement) {
             $envContent = preg_replace($pattern, $replacement, $envContent);
+        }
+
+        // 如果传入了 Redis 参数，也更新 Redis 配置
+        if (!empty($redisParams)) {
+            $envContent = $this->replaceEnvRedisParams($envContent, $redisParams);
         }
 
         file_put_contents($envFile, $envContent);
@@ -1503,7 +1574,7 @@ ENV;
      * @return void
      * @throws \Exception
      */
-    private function copyDatabaseTemplateAndCreateEnv(array $dbParams): void
+    private function copyDatabaseTemplateAndCreateEnv(array $dbParams, array $redisParams = []): void
     {
         try {
             $databaseTemplatePath = base_path('resource/data/template/database.php');
@@ -1534,6 +1605,8 @@ ENV;
 
             // 替换数据库配置参数
             $envContent = $this->replaceEnvDatabaseParams($envContent, $dbParams);
+            // 替换 Redis 配置参数
+            $envContent = $this->replaceEnvRedisParams($envContent, $redisParams);
 
             // 写入.env文件
             if (file_put_contents($envFilePath, $envContent) === false) {
@@ -1567,6 +1640,58 @@ ENV;
             'DB_PASSWORD' => $dbParams['password'] ?? 'root',
             'DB_PREFIX'   => $dbParams['prefix'] ?? 'ma_',
         ];
+
+        foreach ($replacements as $key => $value) {
+            $pattern     = '/^' . preg_quote($key) . '=.*$/m';
+            $replacement = $key . '=' . $value;
+            if (preg_match($pattern, $envContent)) {
+                $envContent = preg_replace($pattern, $replacement, $envContent);
+            } else {
+                $envContent .= "\n" . $replacement;
+            }
+        }
+
+        return $envContent;
+    }
+
+    /**
+     * 替换.env文件中的 Redis 参数
+     *
+     * @param string $envContent  .env文件内容
+     * @param array  $redisParams Redis 参数（host, port, password）
+     *
+     * @return string 替换后的内容
+     */
+    private function replaceEnvRedisParams(string $envContent, array $redisParams): string
+    {
+        $host     = $redisParams['host'] ?? '127.0.0.1';
+        $port     = $redisParams['port'] ?? '6379';
+        $password = $redisParams['password'] ?? '';
+
+        // 主 Redis 配置
+        $replacements = [
+            'REDIS_HOST'     => $host,
+            'REDIS_PORT'     => $port,
+            'REDIS_PASSWORD' => $password,
+        ];
+
+        // 队列 Redis 配置（复用连接信息，使用 redis:// DSN 格式）
+        $queueHost = ($password ? "redis://:{$password}@" : 'redis://') . $host . ':' . $port;
+        $queueReplacements = [
+            'QUEUE_REDIS_HOST'     => $queueHost,
+            'QUEUE_REDIS_PORT'     => $port,
+            'QUEUE_REDIS_PASSWORD' => $password,
+        ];
+
+        // 缓存 Redis 配置（复用连接信息）
+        $cacheReplacements = [
+            'CACHE_CUSTOM_REDIS_HOST'     => $host,
+            'CACHE_CUSTOM_REDIS_PORT'     => $port,
+            'CACHE_CUSTOM_REDIS_PASSWORD' => $password,
+        ];
+
+        // 合并所有替换项
+        $replacements = array_merge($replacements, $queueReplacements, $cacheReplacements);
 
         foreach ($replacements as $key => $value) {
             $pattern     = '/^' . preg_quote($key) . '=.*$/m';

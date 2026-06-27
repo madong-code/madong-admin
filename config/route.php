@@ -171,6 +171,26 @@ Route::any('/upload/[{path:.+}]', function (Request $request, $path = '') {
 
 
 /**
+ * 根目录资源文件（如 /logo.png, /favicon.ico）
+ * 显式列出已知文件，避免万能匹配导致路由冲突
+ */
+Route::get('/logo.png', function () {
+    $file = public_path() . '/logo.png';
+    if (!is_file($file)) {
+        return response('', 404);
+    }
+    return response('')->withFile($file);
+});
+Route::get('/favicon.ico', function () {
+    $file = public_path() . '/favicon.ico';
+    if (!is_file($file)) {
+        return response('', 404);
+    }
+    return response('')->withFile($file);
+});
+
+
+/**
  * 关闭默认路由
  */
 Route::disableDefaultRoute();

@@ -194,7 +194,24 @@ class Index
     public function testDatabase(Request $request): Response
     {
         try {
-            $databaseConfig = $request->all();
+            $allParams = $request->all();
+
+            // 提取数据库配置
+            $databaseConfig = [
+                'host'     => $allParams['host'] ?? '',
+                'port'     => $allParams['port'] ?? '',
+                'username' => $allParams['username'] ?? '',
+                'password' => $allParams['password'] ?? '',
+                'database' => $allParams['database'] ?? '',
+                'prefix'   => $allParams['prefix'] ?? 'ma_',
+            ];
+
+            // 提取 Redis 配置
+            $redisConfig = [
+                'host'     => $allParams['redisHost'] ?? $allParams['redis_host'] ?? '127.0.0.1',
+                'port'     => $allParams['redisPort'] ?? $allParams['redis_port'] ?? '6379',
+                'password' => $allParams['redisPassword'] ?? $allParams['redis_password'] ?? '',
+            ];
 
             // 验证数据库配置
             $dbErrors = $this->installService->validateDatabaseConfig($databaseConfig);
@@ -202,13 +219,26 @@ class Index
                 return Json::fail(implode('; ', $dbErrors));
             }
 
-            // 测试数据库连接逻辑
-            $result = $this->installService->testDatabaseConnection($databaseConfig);
+            // 测试数据库连接
+            $dbResult = $this->installService->testDatabaseConnection($databaseConfig);
+            $dbMessage = $dbResult['message'] ?? '数据库连接成功';
 
-            // 测试成功后，配置 .env 文件（为后续安装步骤准备）
-            $this->installService->saveDatabaseConfig($databaseConfig);
+            // 测试 Redis 连接
+            $redisMessage = '';
+            try {
+                $redisResult = $this->installService->testRedisConnection($redisConfig);
+                $redisMessage = $redisResult['message'] ?? 'Redis 连接成功';
+            } catch (Throwable $e) {
+                return Json::fail('Redis 连接失败: ' . $e->getMessage());
+            }
 
-            return Json::success('数据库连接测试成功', $result);
+            // 全部测试成功后，保存配置到 .env
+            $this->installService->saveDatabaseConfig($databaseConfig, $redisConfig);
+
+            return Json::success('数据库和 Redis 连接测试成功', [
+                'database' => $dbMessage,
+                'redis'    => $redisMessage,
+            ]);
         } catch (Throwable $e) {
             return Json::fail('数据库连接测试失败: ' . $e->getMessage());
         }
