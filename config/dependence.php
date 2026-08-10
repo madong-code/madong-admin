@@ -12,13 +12,11 @@
  */
 
 use Psr\Container\ContainerInterface;
-use core\jwt\interfaces\TokenStorageInterface;
-use core\jwt\interfaces\BlacklistStorageInterface;
-use core\jwt\storage\RedisTokenStorage;
-use core\jwt\storage\RedisBlacklistStorage;
-use core\jwt\JwtToken;
-
-
+use core\security\jwt\interfaces\TokenStorageInterface;
+use core\security\jwt\interfaces\BlacklistStorageInterface;
+use core\security\jwt\storage\RedisTokenStorage;
+use core\security\jwt\storage\RedisBlacklistStorage;
+use core\security\jwt\JwtToken;
 
 return [
 

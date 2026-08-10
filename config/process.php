@@ -20,7 +20,7 @@ global $argv;
 return [
     'webman'            => [
         'handler'     => Http::class,
-        'listen'      => 'http://0.0.0.0:8001',
+        'listen'      => 'http://0.0.0.0:8500',
         'count'       => cpu_count() * 4,
         'user'        => '',
         'group'       => '',
@@ -60,11 +60,9 @@ return [
         ],
     ],
     'madong-scheduler'  => [
-        'handler' => \core\scheduler\SchedulerServer::class,
+        'handler' => \core\infrastructure\scheduler\SchedulerServer::class,
         'count'   => 1,
-        'listen'  => 'text://' . config('madong.scheduler.app.listen', '0.0.0.0:2001'),
-    ],
-    'push_notification' => [
-        'handler' => \app\process\PushNotification::class,
+        // 监听端口必须与 Client 连接端口一致：core.infrastructure.scheduler.listen（默认 127.0.0.1:2001）
+        'listen'  => 'text://' . config('core.infrastructure.scheduler.listen', '127.0.0.1:2001'),
     ],
 ];

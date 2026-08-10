@@ -16,4 +16,5 @@ return [
     support\bootstrap\Session::class,
     \app\bootstrap\MorphMapBootstrap::class,
     \app\bootstrap\CoreConfigBootstrap::class,
+    \app\bootstrap\ValidationRulesBootstrap::class,
 ];

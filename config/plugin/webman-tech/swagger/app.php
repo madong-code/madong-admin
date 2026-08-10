@@ -1,9 +1,17 @@
 <?php
 
 use OpenApi\Annotations as OAA;
-use OpenApi\Attributes as OA;
 
 return [
+    /**
+     * 自定义路由注册器
+     * 对路由排序，静态路由优先于变量路由，避免 FastRoute 冲突
+     *
+     * @see WebmanTech\Swagger\RouteAnnotation\Reader::getData()
+     * @see \core\business\route\SwaggerRouteRegister
+     */
+    'route_factory'  => '\\core\\business\\route\\SwaggerRouteRegister',
+
     /**
      * 全局开关
      */

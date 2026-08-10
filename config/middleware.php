@@ -11,20 +11,14 @@
  * @license   http://www.opensource.org/licenses/mit-license.php MIT License
  */
 
-use app\middleware\RateLimiterMiddleware;
-
 return [
-    //应用中间件
     'adminapi' => [
-        RateLimiterMiddleware::class,//限流中间件
+        \app\middleware\RateLimiterMiddleware::class,
     ],
-    // 超全局中间件-覆盖插件
     '@'        => [
-        \app\middleware\AllowCrossOriginMiddleware::class,//跨域中间件
-        \app\middleware\Lang::class,//多语言切换中间件
-//        \app\middleware\DemoEnvRouteRestrictionMiddleware::class,// 演示过滤中间件
+        \app\middleware\CheckInstallMiddleware::class,
+        \app\middleware\AllowCrossOriginMiddleware::class,
+        \app\middleware\Lang::class,
     ],
-    // 全局中间件-主项目有效
-    ''         => [
-    ],
+    ''         => [],
 ];

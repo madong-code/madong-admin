@@ -2,36 +2,42 @@
 
 return [
     'adminapi.login.log' => [
-        [\app\adminapi\listener\LoginLogListener::class, 'handle'],
+        [\app\adminapi\listener\system\LoginLogListener::class, 'handle'],
     ],
     'adminapi.operation.log' => [
-        [\app\adminapi\listener\OperationLogListener::class, 'handle'],
+        [\app\adminapi\listener\system\OperationLogListener::class, 'handle'],
     ],
 
     'adminapi.menu.formatting' => [
-        [\app\adminapi\listener\MenuFormattingListener::class, 'handle'],
+        [\app\adminapi\listener\system\MenuFormattingListener::class, 'handle'],
     ],
-    // 积分变动事件
     'adminapi.points.changed' => [
-        [\app\adminapi\listener\PointsChangedListener::class, 'handle'],
+        [\app\adminapi\listener\member\PointsChangedListener::class, 'handle'],
     ],
-    // 会员等级更新事件
     'adminapi.member.level.updated' => [
-        [\app\adminapi\listener\MemberLevelUpdatedListener::class, 'handle'],
+        [\app\adminapi\listener\member\MemberLevelUpdatedListener::class, 'handle'],
     ],
-    // 审核事件
     'adminapi.review.approved' => [
-        [\app\adminapi\listener\ReviewApprovedListener::class, 'handle'],
+        [\app\adminapi\listener\review\ReviewApprovedListener::class, 'handle'],
     ],
     'adminapi.review.rejected' => [
-        [\app\adminapi\listener\ReviewRejectedListener::class, 'handle'],
+        [\app\adminapi\listener\review\ReviewRejectedListener::class, 'handle'],
     ],
     'adminapi.review.created' => [
-        [\app\adminapi\listener\ReviewCreatedListener::class, 'handle'],
+        [\app\adminapi\listener\review\ReviewCreatedListener::class, 'handle'],
+    ],
+    'adminapi.review.canceled' => [
+        [\app\adminapi\listener\review\ReviewCanceledListener::class, 'handle'],
     ],
 
-    // 会员信息拉取事件（注入标签权限码）
-    'member.info.fetched' => [
-        [\app\api\listener\MemberTagPermissionListener::class, 'handle'],
+    'adminapi.message.push' => [
+        [\app\adminapi\listener\content\MessagePushListener::class, 'handle'],
     ],
+
+    'plugin.installing' => [],
+    'plugin.installed' => [],
+    'plugin.uninstalling' => [],
+    'plugin.uninstalled' => [],
+    'plugin.updating' => [],
+    'plugin.updated' => [],
 ];

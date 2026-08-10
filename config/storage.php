@@ -1,69 +1,75 @@
 <?php
 
 return [
-    'templates' => [
-        // 本地存储配置
+    'default' => [
+        'group_code' => 'default',
+        'code' => 'local',
+        'name' => '本地存储',
+        'content' => [
+            'root' => 'public',
+            'dirname' => 'upload',
+            'domain' => '',
+        ],
+        'is_sys' => 1,
+    ],
+    'storages' => [
         [
-            'group_code' => 'storage',
+            'group_code' => 'default',
             'code' => 'local',
-            'name' => '本地存储配置',
+            'name' => '本地存储',
             'content' => [
                 'root' => 'public',
                 'dirname' => 'upload',
-                'domain' => 'http://127.0.0.1:8001'
+                'domain' => '',
             ],
-            'is_sys' => 1
+            'is_sys' => 1,
         ],
-        // OSS存储配置
         [
-            'group_code' => 'storage',
+            'group_code' => 'default',
             'code' => 'oss',
-            'name' => 'OSS存储配置',
+            'name' => '阿里云OSS',
             'content' => [
                 'accessKeyId' => '',
                 'accessKeySecret' => '',
                 'bucket' => '',
                 'domain' => '',
                 'endpoint' => '',
-                'dirname' => ''
+                'dirname' => '',
             ],
-            'is_sys' => 1
+            'is_sys' => 1,
         ],
-        // COS存储配置
         [
-            'group_code' => 'storage',
+            'group_code' => 'default',
             'code' => 'cos',
-            'name' => 'COS存储配置',
+            'name' => '腾讯云COS',
             'content' => [
                 'secretId' => '',
                 'secretKey' => '',
                 'bucket' => '',
                 'domain' => '',
                 'region' => '',
-                'dirname' => ''
+                'dirname' => '',
             ],
-            'is_sys' => 1
+            'is_sys' => 1,
         ],
-        // 七牛云存储配置
         [
-            'group_code' => 'storage',
+            'group_code' => 'default',
             'code' => 'qiniu',
-            'name' => '七牛云存储配置',
+            'name' => '七牛云',
             'content' => [
                 'accessKey' => '',
                 'secretKey' => '',
                 'bucket' => '',
                 'domain' => '',
                 'region' => '',
-                'dirname' => ''
+                'dirname' => '',
             ],
-            'is_sys' => 1
+            'is_sys' => 1,
         ],
-        // S3存储配置
         [
-            'group_code' => 'storage',
+            'group_code' => 'default',
             'code' => 's3',
-            'name' => 'S3存储配置',
+            'name' => 'AWS S3',
             'content' => [
                 'key' => '',
                 'secret' => '',
@@ -73,9 +79,9 @@ return [
                 'region' => '',
                 'version' => '',
                 'endpoint' => '',
-                'acl' => ''
+                'acl' => '',
             ],
-            'is_sys' => 1
+            'is_sys' => 1,
         ],
     ],
 ];

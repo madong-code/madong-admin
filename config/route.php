@@ -26,7 +26,6 @@ require_once app_path('adminapi/config/route.php');
  */
 require_once app_path('api/config/route.php');
 
-
 // 安装页面
 Route::get('/install', function () {
     $file = public_path() . '/install/index.html';
@@ -65,6 +64,15 @@ Route::any('/admin/[{path:.+}]', function (Request $request, $path = '') {
     // 安全检查，避免url里 /../../../password 这样的非法访问
     if (str_contains($path, '..')) {
         return response('<h1>400 Bad Request</h1>', 400);
+    }
+    if ($path === '') {
+        $file = "$admin_path/index.html";
+        if (!is_file($file)) {
+            return response('<h1>404 Not Found</h1>', 404);
+        }
+        return response(file_get_contents($file), 200, [
+            'Content-Type' => 'text/html',
+        ]);
     }
     // 文件
     $file = "$admin_path/$path";
@@ -156,23 +164,26 @@ Route::any('/static/[{path:.+}]', function (Request $request, $path = '') {
  * 需要权限验证
  */
 Route::any('/upload/[{path:.+}]', function (Request $request, $path = '') {
-    $upload_path = public_path() . '/upload';
+    // 统一路径分隔符，兼容 Windows / Linux
+    $upload_path = rtrim(public_path(), '/\\') . DIRECTORY_SEPARATOR . 'upload';
+    $path        = ltrim($path, '/\\');
     // 安全检查，避免url里 /../../../password 这样的非法访问
     if (str_contains($path, '..')) {
         return response('<h1>400 Bad Request</h1>', 400);
     }
-    // 文件
-    $file = "$upload_path/$path";
+    // 文件（将 URL 斜杠转为系统分隔符）
+    $file = $upload_path . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $path);
     if (!is_file($file)) {
         return response('<h1>404 Not Found</h1>', 404);
     }
+    // 响应文件（自动带正确 Content-Type）
     return response('')->withFile($file);
 })->middleware(FileAccessMiddleware::class);
-
 
 /**
  * 根目录资源文件（如 /logo.png, /favicon.ico）
  * 显式列出已知文件，避免万能匹配导致路由冲突
+ * 根目录不存在时，回退到安装包内的 logo
  */
 Route::get('/logo.png', function () {
     $file = public_path() . '/logo.png';
@@ -188,7 +199,6 @@ Route::get('/favicon.ico', function () {
     }
     return response('')->withFile($file);
 });
-
 
 /**
  * 关闭默认路由

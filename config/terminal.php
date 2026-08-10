@@ -32,14 +32,14 @@ return [
     'commands' => [
         'test' => [
             'default' => [
-                'cwd' => '{project_root}/frontend/admin',
+                'cwd' => '{project_root}/template/admin',
                 'command' => 'pnpm run test',
                 'description' => '运行测试命令',
             ],
         ],
         'install' => [
             'admin' => [
-                'cwd' => '{project_root}/frontend/admin',
+                'cwd' => '{project_root}/template/admin',
                 'command' => '{package_manager} install',
                 'description' => '安装Admin前端依赖',
                 'variables' => [
@@ -47,7 +47,7 @@ return [
                 ],
             ],
             'web' => [
-                'cwd' => '{project_root}/frontend/web',
+                'cwd' => '{project_root}/template/web',
                 'command' => '{package_manager} install',
                 'description' => '安装Web前端依赖',
                 'variables' => [
@@ -55,7 +55,7 @@ return [
                 ],
             ],
             'h5' => [
-                'cwd' => '{project_root}/frontend/uni-app',
+                'cwd' => '{project_root}/template/uni-app',
                 'command' => '{package_manager} install',
                 'description' => '安装H5前端依赖',
                 'variables' => [
@@ -63,7 +63,7 @@ return [
                 ],
             ],
             'app' => [
-                'cwd' => '{project_root}/frontend/uni-app',
+                'cwd' => '{project_root}/template/uni-app',
                 'command' => '{package_manager} install',
                 'description' => '安装App前端依赖',
                 'variables' => [
@@ -78,8 +78,8 @@ return [
         ],
         'build' => [
             'admin' => [
-                'cwd' => '{project_root}/frontend/admin',
-                'command' => '{package_manager} run build',
+                'cwd' => '{project_root}/template/admin',
+                'command' => '{package_manager} run build:integrated',
                 'description' => '构建Admin前端',
                 'variables' => [
                     '{package_manager}' => 'npm_package_manager',
@@ -90,8 +90,8 @@ return [
                 ],
             ],
             'web' => [
-                'cwd' => '{project_root}/frontend/web',
-                'command' => '{package_manager} run build',
+                'cwd' => '{project_root}/template/web',
+                'command' => '{package_manager} run build:integrated',
                 'description' => '构建Web前端',
                 'variables' => [
                     '{package_manager}' => 'npm_package_manager',
@@ -102,7 +102,7 @@ return [
                 ],
             ],
             'h5' => [
-                'cwd' => '{project_root}/frontend/uni-app',
+                'cwd' => '{project_root}/template/uni-app',
                 'command' => '{package_manager} run build:h5',
                 'description' => '构建H5前端',
                 'variables' => [
@@ -114,7 +114,7 @@ return [
                 ],
             ],
             'app' => [
-                'cwd' => '{project_root}/frontend/uni-app',
+                'cwd' => '{project_root}/template/uni-app',
                 'command' => '{package_manager} run build:app',
                 'description' => '构建App前端',
                 'variables' => [
@@ -197,7 +197,9 @@ return [
     'frontend_programs' => [
         'admin' => [
             'enabled' => true,
-            'source_dir' => '{project_root}/frontend/admin/dist',
+            'source_dir' => '{project_root}/template/admin/dist',
+            // 实时构建产物不存在时，回退使用源码包中预置的发布目录
+            'fallback_dir' => '{project_root}/template/admin/dist',
             'target_dir' => '{backend_root}/public/admin',
             'copy_mappings' => [
                 '*' => '.',
@@ -213,8 +215,10 @@ return [
             ],
         ],
         'web' => [
-            'enabled' => true,
-            'source_dir' => '{project_root}/frontend/web/.output/public',
+            'enabled' => true, // 官网前端随安装一并发布
+            'source_dir' => '{project_root}/template/web/.output/public',
+            // 实时构建产物不存在时，回退使用源码包中预置的发布目录
+            'fallback_dir' => '{project_root}/template/web/.output/public',
             'target_dir' => '{backend_root}/public/web',
             'copy_mappings' => [
                 '*' => '.',
@@ -230,8 +234,8 @@ return [
             ],
         ],
         'h5' => [
-            'enabled' => true,
-            'source_dir' => '{project_root}/frontend/uni-app/dist/build/h5',
+            'enabled' => false, // 移动端H5未启用
+            'source_dir' => '{project_root}/template/uni-app/dist/build/h5',
             'target_dir' => '{backend_root}/public/h5',
             'copy_mappings' => [
                 '*' => '.',
@@ -247,8 +251,8 @@ return [
             ],
         ],
         'app' => [
-            'enabled' => true,
-            'source_dir' => '{project_root}/frontend/uni-app/dist/build/app',
+            'enabled' => false, // 移动端App壳未启用
+            'source_dir' => '{project_root}/template/uni-app/dist/build/app',
             'target_dir' => '{backend_root}/public/app',
             'copy_mappings' => [
                 '*' => '.',
@@ -264,24 +268,24 @@ return [
             ],
         ],
         'uni-app' => [
-            'enabled' => true,
+            'enabled' => false, // uni-app跨端未启用（目录不存在）
             'platforms' => [
                 'h5' => [
-                    'source_dir' => '{project_root}/frontend/uni-app/dist/build/h5',
+                    'source_dir' => '{project_root}/template/uni-app/dist/build/h5',
                     'target_dir' => '{backend_root}/public/uni-app/h5',
                     'copy_mappings' => [
                         '*' => '.',
                     ],
                 ],
                 'mp-weixin' => [
-                    'source_dir' => '{project_root}/frontend/uni-app/dist/build/mp-weixin',
+                    'source_dir' => '{project_root}/template/uni-app/dist/build/mp-weixin',
                     'target_dir' => '{backend_root}/public/uni-app/mp-weixin',
                     'copy_mappings' => [
                         '*' => '.',
                     ],
                 ],
                 'app-plus' => [
-                    'source_dir' => '{project_root}/frontend/uni-app/dist/build/app-plus',
+                    'source_dir' => '{project_root}/template/uni-app/dist/build/app-plus',
                     'target_dir' => '{backend_root}/public/uni-app/app-plus',
                     'copy_mappings' => [
                         '*' => '.',
@@ -355,15 +359,15 @@ return [
                         'key' => 'install.web',
                         'name' => '安装Web前端依赖',
                     ],
-                    2 => [
+                    3 => [
                         'key' => 'install.h5',
                         'name' => '安装H5前端依赖',
                     ],
-                    3 => [
+                    4 => [
                         'key' => 'install.app',
                         'name' => '安装App前端依赖',
                     ],
-                    4 => [
+                    5 => [
                         'key' => 'install.server',
                         'name' => '安装Server后端依赖',
                     ],
@@ -382,11 +386,11 @@ return [
                         'key' => 'build.web',
                         'name' => '构建Web前端',
                     ],
-                    2 => [
+                    3 => [
                         'key' => 'build.h5',
                         'name' => '构建H5前端',
                     ],
-                    3 => [
+                    4 => [
                         'key' => 'build.app',
                         'name' => '构建App前端',
                     ],

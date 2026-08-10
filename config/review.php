@@ -10,13 +10,18 @@
 return [
     // 审批流模块配置
     'flow'                   => [
-        // 是否启用审批流模式
+        // 是否启用审批流模式（全局默认开关）
+        // 单个审核类型可在各自 review.php 的 types[type]['flow']['enabled'] 覆盖（全局+类型覆盖）
         'enabled' => env('REVIEW_FLOW_ENABLED', false),
 
-        // 审批流服务类（第三方审批流模块提供）
+        // 审批流网关类（实现 core\interface\review\ApprovalFlowGateway）
+        // 默认占位实现：simple 模式本地闭环；workflow 模式仅记录日志，等待真实引擎插件换装。
+        'gateway' => env('REVIEW_FLOW_GATEWAY', \app\service\admin\content\review\NullApprovalFlowGateway::class),
+
+        // 审批流服务类（第三方审批流模块提供，预留）
         'service' => env('REVIEW_FLOW_SERVICE', null),
 
-        // 审批流模型类（第三方审批流模块提供）
+        // 审批流模型类（第三方审批流模块提供，预留）
         'model'   => env('REVIEW_FLOW_MODEL', null),
     ],
 

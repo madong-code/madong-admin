@@ -83,5 +83,3 @@ Route::post(parse_url(config('plugin.webman.push.app.channel_hook'), PHP_URL_PAT
     return 'OK';
 });
 
-
-
