@@ -166,7 +166,7 @@ php webman madong-download:frontend -f
 
 1. 访问 Gitee 仓库下载：
    - 管理后台：https://gitee.com/motion-code/madong-single（template/admin）
-   - 前台：https://gitee.com/motion-code/madong-web（template/web）
+   - 前台：https://gitee.com/motion-code/web-nuxt（template/web）
 
 2. 解压后将代码放置到项目根目录：
    ```
@@ -300,6 +300,17 @@ return [
 - 新增代码生成器，提升开发效率
 - 优化插件安装/卸载流程，统一由插件 Install.php 管理生命周期
 - 新增枚举类规范，统一状态码和业务枚举定义
+
+## AI 开发技能（Skills）
+
+madong 提供一套面向 AI 编码助手的 Skills 技能包，覆盖后端、前端与跨端场景，帮助自动化完成模块开发、代码生成、CRUD 脚手架等任务。
+
+- **仓库地址**：https://gitee.com/motion-code/madong-skills
+- **目录结构**：
+  - `backend/`：后端开发技能（控制器 / 服务 / DAO / 迁移等脚手架）
+  - `frontend/`：前端开发技能（页面 / 表单 / 列表脚手架）
+  - `cross/`：跨端通用技能（约定规范、提交信息、同步脚本等）
+- **使用方式**：将 skills 仓库克隆到本地，按需加载对应技能到 AI 编码助手，按其 SOP 描述执行任务。
 
 ## 官方论坛
 
