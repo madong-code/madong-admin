@@ -145,4 +145,19 @@ return [
         'version'      => 'Version',
         'copyright'    => 'Copyright',
     ],
+
+    // 插件管理
+    'plugin'    => [
+        'error' => [
+            'repeat_install'       => 'Plugin is already installed, cannot reinstall',
+            'not_uninstall'        => 'Plugin is not installed, cannot uninstall',
+            'info_file_not_exist'  => 'Plugin :name info.json file not found',
+            'dependency_missing'   => 'Missing dependency plugin :name',
+            'config_invalid'       => 'Plugin config file is invalid',
+            'dir_not_exist'        => 'Plugin :name directory not found',
+            'version_not_support'  => 'Plugin :name does not support current framework version',
+            'sql_fail'             => 'Plugin database operation failed',
+            'not_uninstall_delete' => 'Plugin :name is not uninstalled, cannot be deleted',
+        ],
+    ],
 ];

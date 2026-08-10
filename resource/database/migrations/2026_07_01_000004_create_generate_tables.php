@@ -1,8 +1,8 @@
 <?php
 
 /**
- * 创建代码生成相关表
- * 
+ * 创建代码生成相关表（generate_* 前缀）
+ *
  * 表:
  * - generate_table (代码生成表配置表)
  * - generate_column (代码生成列配置表)
@@ -15,7 +15,7 @@ return new class {
 
     public function up(Builder $schema): void
     {
-        // 1. 代码生成表配置表（匹配现有模型）
+        // 代码生成表配置表
         if (!$schema->hasTable('generate_table')) {
             $schema->create('generate_table', function (Blueprint $table) {
                 $table->bigInteger('id')->primary()->comment('主键ID');
@@ -41,7 +41,7 @@ return new class {
             });
         }
 
-        // 2. 代码生成列配置表（匹配现有模型）
+        // 代码生成列配置表
         if (!$schema->hasTable('generate_column')) {
             $schema->create('generate_column', function (Blueprint $table) {
                 $table->bigInteger('id')->primary()->comment('主键ID');
@@ -83,18 +83,17 @@ return new class {
                 $table->foreign('table_id')->references('id')->on('generate_table')->onDelete('cascade');
             });
         }
+
+        echo "Created generate tables.\n";
     }
 
     public function down(Builder $schema): void
     {
-        // 删除外键约束
         if ($schema->hasTable('generate_column')) {
             $schema->table('generate_column', function (Blueprint $table) {
                 $table->dropForeign(['table_id']);
             });
         }
-
-        // 删除表
         $schema->dropIfExists('generate_column');
         $schema->dropIfExists('generate_table');
     }

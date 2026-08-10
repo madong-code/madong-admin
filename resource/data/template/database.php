@@ -1,9 +1,9 @@
+
 <?php
 /**
  * This file is part of webman.
  * Licensed under The MIT License
  * For full copyright and license information, please see the MIT-LICENSE.txt
- * Redistributions of files must retain the above copyright notice.
  *
  * @author    walkor<walkor@workerman.net>
  * @copyright walkor<walkor@workerman.net>
@@ -16,6 +16,7 @@ return [
     // 默认数据库
     'default'     => 'mysql',
     'connections' => [
+        // ========== 主数据库（系统与平台运营数据） ==========
         'mysql' => [
             'driver'      => 'mysql',
             'host'        => env('DB_HOST', ''),
@@ -40,3 +41,4 @@ return [
         ],
     ],
 ];
+

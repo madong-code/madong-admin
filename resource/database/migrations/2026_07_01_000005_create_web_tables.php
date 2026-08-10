@@ -1,7 +1,8 @@
 <?php
 
 /**
- * 创建Web相关表
+ * 创建 Web 前端相关表（web_* 前缀）
+ *
  * 表:
  * - web_menu (Web菜单表)
  * - web_link (友情链接表)
@@ -15,7 +16,7 @@ return new class {
 
     public function up(Builder $schema): void
     {
-        // 1. Web菜单表
+        // Web菜单表
         if (!$schema->hasTable('web_menu')) {
             $schema->create('web_menu', function (Blueprint $table) {
                 $table->bigInteger('id')->primary()->comment('主键');
@@ -24,6 +25,8 @@ return new class {
                 $table->string('category', 32)->default('1')->comment('菜单分类');
                 $table->string('source', 50)->default('system')->comment('菜单来源');
                 $table->string('code', 64)->nullable()->comment('唯一编码');
+                $table->tinyInteger('is_public')->default(0)->comment('是否公开菜单: 0否(需权限) 1是(所有人可见)');
+                $table->tinyInteger('is_no_auth')->default(0)->comment('is_public=0时是否跳过权限校验: 0=需权限 1=仅需登录');
                 $table->string('name', 64)->comment('菜单名称');
                 $table->string('url', 255)->nullable()->comment('链接地址');
                 $table->string('icon', 64)->nullable()->comment('菜单图标');
@@ -42,7 +45,7 @@ return new class {
             });
         }
 
-        // 2. 友情链接表
+        // 友情链接表
         if (!$schema->hasTable('web_link')) {
             $schema->create('web_link', function (Blueprint $table) {
                 $table->bigInteger('id')->primary()->comment('主键');
@@ -61,7 +64,7 @@ return new class {
             });
         }
 
-        // 3. 广告表
+        // 广告表
         if (!$schema->hasTable('web_adv')) {
             $schema->create('web_adv', function (Blueprint $table) {
                 $table->bigInteger('id')->primary()->comment('主键');

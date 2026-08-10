@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace resource\database\seeds;
 
 use app\model\member\MemberLevel;
-use core\uuid\Snowflake;
+use core\io\uuid\Snowflake;
 use Illuminate\Database\Seeder;
 use support\Db;
 

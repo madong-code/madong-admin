@@ -6,8 +6,9 @@
 declare(strict_types=1);
 namespace resource\database\seeds;
 
-use app\model\system\Menu;
-use core\uuid\Snowflake;
+
+use app\model\system\menu\Menu;
+use core\io\uuid\Snowflake;
 use Illuminate\Database\Seeder;
 
 
@@ -15,7 +16,6 @@ class MenuSeeder extends Seeder
 {
     public function run(): void
     {
-        // 清空表
         Menu::truncate();
 
         $menus = include base_path('resource/data/menu/admin.php');

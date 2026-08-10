@@ -6,9 +6,9 @@
 declare(strict_types=1);
 namespace resource\database\seeds;
 
-use app\model\dict\Dict;
-use app\model\dict\DictItem;
-use core\uuid\Snowflake;
+use app\model\system\dict\Dict;
+use app\model\system\dict\DictItem;
+use core\io\uuid\Snowflake;
 use Illuminate\Database\Seeder;
 
 class DictSeeder extends Seeder
