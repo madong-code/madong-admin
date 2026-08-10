@@ -1,8 +1,8 @@
-# madong-server
+# madong 极速后台开发框架
 
 ## 介绍
 
-madong-server 是 5.x 版本的后端服务，基于 PHP Webman 框架开发的极速开发平台，为前端应用提供稳定、高效的 API 服务。
+基于 PHP Webman 框架开发的极速开发平台，为前端应用提供稳定、高效的 API 服务。
 
 ## 技术栈
 
@@ -20,65 +20,72 @@ madong-server 是 5.x 版本的后端服务，基于 PHP Webman 框架开发的�
 ```
 madong/                          # 项目根目录
 ├── backend/                     # 后端目录（当前目录）
-│   ├── app/                    # 应用目录
-│   │   ├── adminapi/           # 管理后台 API（控制器、验证器等）
-│   │   ├── api/                # 前台 API（控制器、验证器等）
-│   │   ├── bootstrap/          # 启动引导文件
-│   │   ├── command/            # 命令行工具
-│   │   ├── dao/                # 数据访问层
-│   │   ├── enum/                # 枚举类
+│   ├── app/                    # 应用目录（单体分层结构）
+│   │   ├── adminapi/           # 管理后台 API
+│   │   │   ├── config/         # 后台 API 配置
+│   │   │   ├── controller/     # 后台控制器（按业务域组织文件）
+│   │   │   ├── event/          # 后台事件
+│   │   │   ├── listener/       # 后台事件监听器
+│   │   │   ├── middleware/     # 后台中间件
+│   │   │   ├── schema/         # 后台数据结构定义
+│   │   │   ├── validate/       # 后台验证器
+│   │   │   └── CurrentUser.php # 当前用户上下文
+│   │   ├── api/                # 前台 API
+│   │   │   ├── config/         # 前台 API 配置
+│   │   │   ├── controller/     # 前台控制器（按站点组织文件）
+│   │   │   ├── event/          # 前台事件
+│   │   │   ├── listener/       # 前台事件监听器
+│   │   │   ├── middleware/     # 前台中间件
+│   │   │   ├── schema/         # 前台数据结构定义
+│   │   │   ├── validate/       # 前台验证器
+│   │   │   └── CurrentMember.php # 当前会员上下文
+│   │   ├── dao/                # 数据访问层（按业务域：content/member_sign/ops/site/sys_admin_type/system）
+│   │   ├── enum/               # 枚举类（content/system）
+│   │   ├── model/              # 模型（content/ops/system）
+│   │   ├── service/            # 业务服务层（admin/api/core）
+│   │   ├── schema/             # 数据结构定义（response/plugin）
+│   │   ├── command/            # 命令行工具（plugin 迁移）
 │   │   ├── event/              # 事件定义
-│   │   ├── install/            # 安装脚本
 │   │   ├── listener/           # 事件监听器
-│   │   ├── middleware/         # 中间件
-│   │   ├── model/              # 模型
+│   │   ├── bootstrap/          # 启动引导文件
+│   │   ├── middleware/          # 中间件
 │   │   ├── process/            # 自定义进程
 │   │   ├── queue/              # 队列任务
-│   │   ├── schema/             # 数据结构定义
-│   │   ├── scope/              # 作用域定义
-│   │   ├── service/            # 业务服务层
+│   │   ├── scope/              # 模型作用域
+│   │   ├── install/            # 安装脚本
+│   │   ├── exception/          # 异常处理
 │   │   └── functions.php       # 全局函数
 │   ├── config/                  # 配置文件
-│   │   ├── plugin/              # 插件配置
+│   │   ├── plugin/              # 插件配置（limiter/validation 等）
 │   │   ├── route/               # 路由配置
 │   │   └── *.php                # 各类配置文件
-│   ├── core/                    # 核心框架
-│   │   ├── base/                # 基础类
-│   │   ├── cache/               # 缓存组件
-│   │   ├── captcha/             # 验证码组件
-│   │   ├── db/                  # 数据库组件
-│   │   ├── email/               # 邮件服务
-│   │   ├── excel/               # Excel 导入导出
-│   │   ├── exception/           # 异常处理
-│   │   ├── generator/           # 代码生成器
-│   │   ├── interface/           # 接口定义
-│   │   ├── jwt/                 # JWT 认证
-│   │   ├── logger/              # 日志组件
-│   │   ├── notify/              # 通知服务
-│   │   ├── plugin/              # 插件核心
-│   │   ├── route/               # 路由组件
-│   │   ├── scheduler/           # 定时任务
-│   │   ├── sms/                 # 短信服务
-│   │   ├── tool/                # 工具类
-│   │   ├── trait/               # 特性类
-│   │   ├── upload/              # 文件上传
-│   │   ├── uuid/                # UUID 生成
+│   ├── core/                    # 核心框架（领域分层架构）
+│   │   ├── business/           # 业务核心（多租户/审批等）
+│   │   ├── communication/      # 通信（sms/email/notify 消息通知）
+│   │   ├── foundation/         # 基础组件（cache/db/uuid/jwt/logger）
+│   │   ├── infrastructure/     # 基础设施（存储/队列等）
+│   │   ├── interface/          # 接口定义（契约/抽象）
+│   │   ├── io/                 # IO（upload 上传 / excel 导入导出）
+│   │   ├── security/           # 安全（captcha 验证码 / exception 异常）
 │   │   └── functions.php        # 核心函数
 │   ├── plugin/                   # 插件目录
+│   │   ├── codegen/              # 代码生成插件（后端）
+│   │   └── demo/                 # 演示插件（运行时 + 前端模板源）
 │   ├── public/                   # 静态资源
-│   ├── resource/                 # 资源文件
+│   ├── resource/                 # 资源文件（migrations 迁移 / seeds 种子 / menu 菜单 / translations 翻译）
 │   ├── runtime/                  # 运行时文件
 │   ├── support/                  # 第三方支持库
 │   ├── tests/                    # 单元测试
 │   ├── vendor/                   # Composer 依赖包
 │   ├── composer.json             # Composer 配置
 │   ├── composer.lock             # 依赖锁定文件
-│   ├── phinx.php                 # 数据库迁移配置
+│   ├── phpunit.xml               # 测试配置
 │   └── README.md                 # 项目说明文档
 │
-└── frontend/                     # 前端目录（需单独下载）
+└── template/                     # 前端模板目录（需单独下载）
     ├── admin/                    # 管理后台前端
-    └── web/                      # 前台前端
+    ├── web/                      # 前台前端
+    └── install/                  # 安装器前端
 ```
 
 > **注意**：前后端分离部署，前端目录需单独下载或创建。
@@ -91,12 +98,13 @@ madong/                          # 项目根目录
 - **邮件服务**：支持邮件发送功能
 - **文件上传**：支持多种存储方式
 - **国际化**：支持多语言配置
-- **插件系统**：支持第三方扩展
-- **命令行工具**：支持更多操作
+- **插件系统**：支持第三方扩展（codegen 代码生成、demo 演示等）
+- **命令行工具**：支持更多操作（插件迁移等）
 - **SSE 实时推送**：支持 Server-Sent Events 实时进度反馈
 - **服务层架构**：清晰的 DAO/Service 分层设计
 - **代码生成器**：自动化生成控制器、模型、服务层代码
 - **数据迁移**：支持数据库版本化管理
+- **单体架构**：标准版与多租户版统一架构，便于按需启用
 
 ## 运行环境
 
@@ -157,16 +165,17 @@ php webman madong-download:frontend -f
 如果没有安装 Git 或无法使用命令，可手动下载前端代码：
 
 1. 访问 Gitee 仓库下载：
-   - 管理后台：https://gitee.com/motion-code/madong-vue
-   - 前台：https://gitee.com/motion-code/madong-nuxt
+   - 管理后台：https://gitee.com/motion-code/madong-single（template/admin）
+   - 前台：https://gitee.com/motion-code/madong-web（template/web）
 
 2. 解压后将代码放置到项目根目录：
    ```
    madong/
    ├── backend/          # 后端代码
-   └── frontend/         # 前端代码
-       ├── admin/        # 管理后台前端（来自 madong-vue）
-       └── web/          # 前台前端（来自 madong-nuxt）
+   └── template/         # 前端模板代码
+       ├── admin/        # 管理后台前端（来自 madong-single）
+       ├── web/          # 前台前端（来自 madong-web）
+       └── install/      # 安装器前端
    ```
 
 ### 4. 启动安装向导
@@ -174,7 +183,7 @@ php webman madong-download:frontend -f
 完成以上步骤后，访问安装向导完成系统配置：
 
 ```
-http://127.0.0.1:8001/install
+http://127.0.0.1:8500/install
 ```
 
 ### 5. 启动服务
@@ -190,7 +199,7 @@ php start.php start
 php start.php start -d
 ```
 
-服务默认运行在 `http://127.0.0.1:8001`
+服务默认运行在 `http://127.0.0.1:8500`
 
 ## 配置说明
 
@@ -235,7 +244,7 @@ return [
 ## API 文档
 
 启动服务后，可通过以下方式访问 API 文档：
-- 查看 `app/controller` 目录下的控制器文件
+- 查看 `app/adminapi/controller` 与 `app/api/controller` 目录下的控制器文件
 - 参考项目文档
 
 ## 开发指南
@@ -244,15 +253,15 @@ return [
 
 - 遵循 PSR-4 自动加载规范
 - 遵循 PSR-12 代码风格规范
-- 使用 PHP 8.0+ 的特性
+- 使用 PHP 8.2+ 的特性
 
 ### 模块开发
 
-1. 创建控制器：在 `app/adminapi`（管理后台）或 `app/api`（前台）目录下创建控制器
-2. 创建服务层：在 `app/service` 目录下创建业务逻辑
-3. 创建 DAO 层：在 `app/dao` 目录下创建数据访问对象
-4. 创建模型：在 `app/model` 目录下创建 Eloquent 模型
-5. 配置路由：在 `config/route/adminapi.php` 或 `config/route/api.php` 文件中添加路由
+1. 创建控制器：在 `app/adminapi/controller`（按业务域组织文件）或 `app/api/controller`（按站点组织文件）目录下创建控制器
+2. 创建服务层：在 `app/service` 对应业务域目录下创建业务逻辑
+3. 创建 DAO 层：在 `app/dao` 对应业务域目录下创建数据访问对象
+4. 创建模型：在 `app/model` 对应业务域目录下创建 Eloquent 模型
+5. 配置路由：在 `config/route.php` 或 `config/route/adminapi.php` / `config/route/api.php` 文件中添加路由
 6. 测试：使用 Postman 或其他工具测试 API
 
 
@@ -264,7 +273,17 @@ return [
 
 ## 更新日志
 
-### 5.x 版本
+### v5.1.0（当前版本）
+
+- 后端重构为 **madong 单体后台架构**，统一支持标准版与多租户版
+- **框架核心分层**：`core` 重构为 business / communication / foundation / infrastructure / interface / io / security 分层，移除旧的扁平 core 模块
+- **应用业务层重组**：`app` 重组为 adminapi（controller/事件/监听/验证器按业务域组织）与 api（前台站点）双入口，dao / model / enum / service / schema 按业务域分层，补充 command 插件迁移、event/listener、bootstrap 模块
+- **插件清理**：移除 `plugin/example` 示例插件，精简 `plugin/demo` 前端模板源，新增 `plugin/codegen` 代码生成插件
+- **数据迁移**：迁移文件重命名（2026_04_01 → 2026_07_01），新增系统/会员/代码生成/站点/审核表迁移，大幅更新菜单与种子数据
+- **配置与安装**：新增 `limiter`、重命名 `rate-limiter`，新增 `validation` 插件配置，更新安装器资源与 `composer` 依赖
+- **测试**：新增 `phpunit.xml` 单元测试配置
+
+### 5.0 版本
 
 - 重构后端架构，基于 Webman 框架
 - 实现 JWT 认证机制
