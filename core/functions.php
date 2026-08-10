@@ -1,9 +1,21 @@
 <?php
+declare(strict_types=1);
+
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 /**
  * Here is your custom functions.
  */
 
-use core\exception\handler\CommonException;
+use core\foundation\exception\handler\CommonException;
 use Webman\Route;
 
 if (!function_exists('full_url')) {
