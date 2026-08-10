@@ -1,136 +1,190 @@
+<script lang="ts" setup>
+import { ref } from 'vue';
+
+import { ElCard, ElTabPane, ElTabs } from 'element-plus';
+
+import { ImageSelector } from '#/components/form/components';
+import { Page } from '#/components/page';
+import { $t } from '#/locales';
+
+// 1. 单选
+const singleValue = ref('');
+// 2. 多选
+const multipleValue = ref<string[]>([]);
+// 3. 大尺寸单选（带默认值）
+const defaultSingleValue = ref('/upload/default-avatar.webp');
+// 4. 禁用
+const disabledValue = ref('/upload/default-avatar.webp');
+</script>
+
 <template>
-  <div class="test-page p-5">
-    <h1 class="text-2xl font-bold mb-5">图片选择器组件测试</h1>
-    
-    <!-- 单选测试 -->
-    <div class="mb-8 p-5 bg-white rounded-lg shadow-sm">
-      <h2 class="text-xl font-semibold mb-3 text-g-800">1. 单选模式</h2>
+  <Page
+    :description="$t('demo.widgets.image-selector.desc')"
+    :title="$t('demo.widgets.image-selector.title')"
+  >
+    <!-- 1. 单选模式 -->
+    <ElCard class="mb-4" shadow="never">
+      <template #header>
+        <span class="font-medium">1. {{ $t('demo.widgets.image-selector.single_mode') }}</span>
+      </template>
       <div class="flex items-center gap-5">
         <ImageSelector
-          v-model="singleImage"
-          :multiple="false"
+          v-model="singleValue"
+          accept="image/*"
+          object-type="default"
           shape="circle"
           size="medium"
-          @confirm="handleSingleConfirm"
         />
         <div class="text-sm">
-          <div class="font-medium">已选择:</div>
-          <div class="text-g-600 mt-1 break-all">{{ singleImage || '未选择' }}</div>
+          <div class="font-medium">
+            {{ $t('demo.widgets.image-selector.selected') }}:
+          </div>
+          <div
+            class="mt-1 break-all"
+            style="color: var(--el-text-color-secondary)"
+          >
+            {{ singleValue || $t('demo.widgets.image-selector.not_selected') }}
+          </div>
         </div>
       </div>
-    </div>
+    </ElCard>
 
-    <!-- 多选测试 -->
-    <div class="mb-8 p-5 bg-white rounded-lg shadow-sm">
-      <h2 class="text-xl font-semibold mb-3 text-g-800">2. 多选模式</h2>
+    <!-- 2. 多选模式 -->
+    <ElCard class="mb-4" shadow="never">
+      <template #header>
+        <span class="font-medium">2. {{ $t('demo.widgets.image-selector.multiple_mode') }}</span>
+      </template>
       <ImageSelector
-        v-model="multipleImages"
+        v-model="multipleValue"
+        accept="image/*"
+        object-type="default"
         :multiple="true"
         shape="square"
         size="small"
-        @confirm="handleMultipleConfirm"
       />
       <div class="mt-3 text-sm">
-        <div class="font-medium">已选择 ({{ multipleImages.length }} 张):</div>
-        <div class="text-g-600 mt-1 break-all">{{ multipleImages.length > 0 ? multipleImages.join(', ') : '未选择' }}</div>
-      </div>
-    </div>
-
-    <!-- 大尺寸单选 -->
-    <div class="mb-8 p-5 bg-white rounded-lg shadow-sm">
-      <h2 class="text-xl font-semibold mb-3 text-g-800">3. 大尺寸单选（带默认值）</h2>
-      <div class="flex items-center gap-5">
-        <ImageSelector
-          v-model="largeImage"
-          :multiple="false"
-          shape="square"
-          size="large"
-          :default-selected="'/upload/default-avatar.webp'"
-          @confirm="handleLargeConfirm"
-        />
-        <div class="text-sm">
-          <div class="font-medium">已选择:</div>
-          <div class="text-g-600 mt-1 break-all">{{ largeImage || '未选择' }}</div>
+        <div class="font-medium">
+          {{ $t('demo.widgets.image-selector.selected') }} ({{
+            multipleValue.length
+          }}
+          {{ $t('demo.widgets.image-selector.count') }}):
+        </div>
+        <div
+          class="mt-1 break-all"
+          style="color: var(--el-text-color-secondary)"
+        >
+          {{
+            multipleValue.length > 0
+              ? multipleValue.join(', ')
+              : $t('demo.widgets.image-selector.not_selected')
+          }}
         </div>
       </div>
-    </div>
+    </ElCard>
 
-    <!-- 禁用状态 -->
-    <div class="mb-8 p-5 bg-white rounded-lg shadow-sm">
-      <h2 class="text-xl font-semibold mb-3 text-g-800">4. 禁用状态</h2>
+    <!-- 3. 大尺寸单选（带默认值） -->
+    <ElCard class="mb-4" shadow="never">
+      <template #header>
+        <span class="font-medium">3. {{ $t('demo.widgets.image-selector.large_single') }}</span>
+      </template>
+      <div class="flex items-center gap-5">
+        <ImageSelector
+          v-model="defaultSingleValue"
+          accept="image/*"
+          object-type="default"
+          shape="square"
+          size="large"
+        />
+        <div class="text-sm">
+          <div class="font-medium">
+            {{ $t('demo.widgets.image-selector.selected') }}:
+          </div>
+          <div
+            class="mt-1 break-all"
+            style="color: var(--el-text-color-secondary)"
+          >
+            {{
+              defaultSingleValue ||
+              $t('demo.widgets.image-selector.not_selected')
+            }}
+          </div>
+        </div>
+      </div>
+    </ElCard>
+
+    <!-- 4. 禁用状态 -->
+    <ElCard class="mb-4" shadow="never">
+      <template #header>
+        <span class="font-medium">4. {{ $t('demo.widgets.image-selector.disabled') }}</span>
+      </template>
       <ImageSelector
-        v-model="disabledImage"
-        :multiple="false"
+        v-model="disabledValue"
+        accept="image/*"
+        object-type="default"
+        :disabled="true"
         shape="circle"
         size="medium"
-        :disabled="true"
       />
-      <div class="mt-2 text-sm text-g-600">
-        禁用状态下的组件不可点击
+      <div class="mt-2 text-sm" style="color: var(--el-text-color-secondary)">
+        {{ $t('demo.widgets.image-selector.disabled_tip') }}
       </div>
-    </div>
+    </ElCard>
 
-    <!-- 代码示例 -->
-    <div class="mb-8 p-5 bg-white rounded-lg shadow-sm">
-      <h2 class="text-xl font-semibold mb-3 text-g-800">5. 代码示例</h2>
+    <!-- 5. 代码示例 -->
+    <ElCard shadow="never">
+      <template #header>
+        <span class="font-medium">5. {{ $t('demo.widgets.image-selector.code_example') }}</span>
+      </template>
       <ElTabs>
-        <ElTabPane label="单选">
-          <pre class="bg-g-100 p-3 rounded text-sm overflow-auto">{{ singleCode }}</pre>
+        <ElTabPane :label="$t('demo.widgets.image-selector.single')">
+          <pre class="code-block"><code>&lt;ImageSelector
+  v-model=&quot;singleValue&quot;
+  accept=&quot;image/*&quot;
+  object-type=&quot;default&quot;
+  shape=&quot;circle&quot;
+  size=&quot;medium&quot;
+/&gt;</code></pre>
         </ElTabPane>
-        <ElTabPane label="多选">
-          <pre class="bg-g-100 p-3 rounded text-sm overflow-auto">{{ multipleCode }}</pre>
+        <ElTabPane :label="$t('demo.widgets.image-selector.multiple')">
+          <pre class="code-block"><code>&lt;ImageSelector
+  v-model=&quot;multipleValue&quot;
+  accept=&quot;image/*&quot;
+  object-type=&quot;default&quot;
+  :multiple=&quot;true&quot;
+  shape=&quot;square&quot;
+  size=&quot;small&quot;
+/&gt;</code></pre>
+        </ElTabPane>
+        <ElTabPane :label="$t('demo.widgets.image-selector.large')">
+          <pre class="code-block"><code>&lt;ImageSelector
+  v-model=&quot;defaultSingleValue&quot;
+  accept=&quot;image/*&quot;
+  object-type=&quot;default&quot;
+  shape=&quot;square&quot;
+  size=&quot;large&quot;
+/&gt;</code></pre>
+        </ElTabPane>
+        <ElTabPane :label="$t('demo.widgets.image-selector.disabled')">
+          <pre class="code-block"><code>&lt;ImageSelector
+  v-model=&quot;disabledValue&quot;
+  accept=&quot;image/*&quot;
+  object-type=&quot;default&quot;
+  :disabled=&quot;true&quot;
+  shape=&quot;circle&quot;
+  size=&quot;medium&quot;
+/&gt;</code></pre>
         </ElTabPane>
       </ElTabs>
-    </div>
-  </div>
+    </ElCard>
+  </Page>
 </template>
 
-<script setup lang="ts">
-import { ref } from 'vue'
-import ImageSelector from '@/components/form/components/image-selector/index.vue'
-import { ElMessage } from 'element-plus'
-import { $t } from '@/locales'
-
-// 测试数据
-const singleImage = ref<string>('')
-const multipleImages = ref<string[]>([])
-const largeImage = ref<string>('/upload/default-avatar.webp')
-const disabledImage = ref<string>('/upload/default-avatar.webp')
-
-// 事件处理
-const handleSingleConfirm = (image: string) => {
-  ElMessage.success(`单选确认: ${image}`)
-}
-
-const handleMultipleConfirm = (images: string[]) => {
-  ElMessage.success(`多选确认: 选择了 ${images.length} 张图片`)
-}
-
-const handleLargeConfirm = (image: string) => {
-  ElMessage.success(`大尺寸确认: ${image}`)
-}
-
-// 代码示例
-const singleCode = `<ImageSelector
-  v-model="singleImage"
-  :multiple="false"
-  shape="circle"
-  size="medium"
-  @confirm="handleConfirm"
-/>`
-
-const multipleCode = `<ImageSelector
-  v-model="multipleImages"
-  :multiple="true"
-  shape="square"
-  size="small"
-  @confirm="handleConfirm"
-/>`
-</script>
-
 <style lang="scss" scoped>
-.test-page {
-  max-width: 1200px;
-  margin: 0 auto;
+.code-block {
+  padding: 0.75rem;
+  overflow: auto;
+  font-size: 0.875rem;
+  background: var(--el-fill-color-light);
+  border-radius: var(--el-border-radius-base);
 }
 </style>

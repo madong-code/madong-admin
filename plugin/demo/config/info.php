@@ -5,30 +5,21 @@
  */
 
 return [
-    'name'         => 'demo',
-    'identifier'   => 'demo',
-    'version'      => '1.0.0',
-    'description'  => '示例插件',
-    'author'       => 'Madong',
-    'author_email' => 'support@madong.tech',
-    'website'      => 'https://www.madong.tech',
-    'require'      => [
-        'composer' => [
-
+        'name' => 'demo',
+        'identifier' => 'demo',
+        'type' => 'madong:app',
+        'version' => '1.0.0',
+        'description' => '一款面向调试与测试的示例插件，模拟常见扩展功能逻辑，帮助开发者快速验证接口、样式、交互效果。
+插件轻量化运行，无冗余依赖，兼容当前系统版本，安装即用。',
+        'author' => 'Mr.April',
+        'author_email' => '',
+        'website' => 'https://madong.tech',
+        'uninstall' => [
+            'drop_tables' => true, //卸载时会删除 demo_test 数据表
+            'remove_dependencies' => false,//卸载时移除 composer/npm 依赖
+            'undeletable' => false,//卸载后无法删除
         ],
-    ],
-    'npm_require'  => [
-        'admin' => [
-
+        'resource' => [
+            'menu' => 'data/menu', // 菜单文件位于 resource/data/menu/ 而非默认的 resource/menu/
         ],
-        'web'   => [
-
-        ],
-    ],
-    'uninstall'    => [
-        'undeletable'         => false,
-        'drop_tables'         => false,
-        'remove_dependencies' => false,
-    ],
-    'type'         => 'madong',
-];
+    ];
