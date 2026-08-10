@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace DummyNamespace;
 
-use core\base\BaseController;
+use core\foundation\base\BaseController;
 use support\Request;
 use app\adminapi\controller\Crud;
 

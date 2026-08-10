@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -18,8 +19,6 @@ enum NoticeType: string
 
     case ANNOUNCEMENT = 'announcement';
     case NOTICE = 'notice';
-
-
 
     //定义一个方法以获取状态的描述
     public function label(): string

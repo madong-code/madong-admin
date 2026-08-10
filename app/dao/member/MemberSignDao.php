@@ -1,10 +1,20 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\dao\member;
 
 use app\service\api\member\MemberService;
-use core\base\BaseDao;
+use core\foundation\base\BaseDao;
 use app\model\member\MemberSign;
 use support\Container;
 
@@ -24,7 +34,7 @@ class MemberSignDao extends BaseDao
     /**
      * 创建签到记录
      */
-    public function created(int $memberId, string $signDate, int $points, int $continuousDays, array $deviceInfo = []): MemberSign
+    public function created(int|string $memberId, string $signDate, int $points, int $continuousDays, array $deviceInfo = []): MemberSign
     {
         $sign = new MemberSign();
         $sign->member_id = $memberId;
@@ -134,7 +144,7 @@ class MemberSignDao extends BaseDao
     /**
      * 获取年度签到统计
      */
-    public function getYearSignStatistics(int|string $memberId, int $year = null): array
+    public function getYearSignStatistics(int|string $memberId, ?int $year = null): array
     {
         if ($year === null) {
             $year = date('Y');
@@ -246,5 +256,107 @@ class MemberSignDao extends BaseDao
         return $this->query()
             ->where('sign_date', '<', $oneYearAgo)
             ->delete();
+    }
+
+    /**
+     * 补签：在指定日期创建签到记录
+     */
+    public function reSign(int|string $memberId, string $signDate, int $points, int $continuousDays): MemberSign
+    {
+        $sign = new MemberSign();
+        $sign->member_id       = $memberId;
+        $sign->sign_date       = $signDate;
+        $sign->points          = $points;
+        $sign->continuous_days = $continuousDays;
+        $sign->is_resign       = 1;
+        $sign->save();
+
+        return $sign;
+    }
+
+    /**
+     * 获取本月补签次数
+     */
+    public function getMonthReSignCount(int|string $memberId): int
+    {
+        $firstDay = date('Y-m-01');
+        $lastDay  = date('Y-m-t');
+
+        return $this->query()
+            ->where('member_id', $memberId)
+            ->where('is_resign', 1)
+            ->whereBetween('sign_date', [$firstDay, $lastDay])
+            ->count();
+    }
+
+    /**
+     * 检查指定日期是否有相邻的已签到日期
+     */
+    public function hasAdjacentSign(int|string $memberId, string $signDate): bool
+    {
+        $prevDay = date('Y-m-d', strtotime($signDate . ' -1 day'));
+        $nextDay = date('Y-m-d', strtotime($signDate . ' +1 day'));
+
+        return $this->query()
+            ->where('member_id', $memberId)
+            ->whereIn('sign_date', [$prevDay, $nextDay])
+            ->exists();
+    }
+
+    /**
+     * 重新计算最近一次连续签到天数（用于补签后修复连续性）
+     */
+    public function recalcContinuousDays(int|string $memberId): int
+    {
+        $records = $this->query()
+            ->where('member_id', $memberId)
+            ->where('sign_date', '<=', date('Y-m-d'))
+            ->orderBy('sign_date', 'desc')
+            ->get();
+
+        if ($records->isEmpty()) {
+            return 0;
+        }
+
+        // 从最近签到日期往前推，统计连续天数
+        $continuous = 0;
+        $lastDate   = null;
+
+        foreach ($records as $record) {
+            $currentDate = $record->sign_date;
+            $recordId    = $record->id;
+
+            if ($lastDate === null) {
+                $continuous = 1;
+                $lastDate   = $currentDate;
+                continue;
+            }
+
+            // 检查是否连续（相差一天）
+            $expectedPrev = date('Y-m-d', strtotime($currentDate . ' +1 day'));
+            if ($expectedPrev === $lastDate) {
+                $continuous++;
+                $lastDate = $currentDate;
+            } else {
+                break; // 中断则停止
+            }
+        }
+
+        // 更新所有记录的 continuous_days
+        $pos = $continuous;
+        $updateRecords = $this->query()
+            ->where('member_id', $memberId)
+            ->where('sign_date', '<=', date('Y-m-d'))
+            ->orderBy('sign_date', 'desc')
+            ->limit($continuous)
+            ->get();
+
+        foreach ($updateRecords as $r) {
+            $r->continuous_days = $pos;
+            $r->save();
+            $pos--;
+        }
+
+        return $continuous;
     }
 }

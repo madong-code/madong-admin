@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -12,7 +13,6 @@ declare(strict_types=1);
  */
 namespace app\adminapi\schema\request\system;
 
-
 use app\schema\request\BaseQueryRequest;
 use OpenApi\Attributes as OA;
 
@@ -22,7 +22,6 @@ use OpenApi\Attributes as OA;
 )]
 class RoleQueryRequest extends BaseQueryRequest
 {
-
 
     #[OA\Property(
         property: 'code',

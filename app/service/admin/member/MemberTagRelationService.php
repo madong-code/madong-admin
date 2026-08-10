@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -9,13 +11,11 @@
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 namespace app\service\admin\member;
 
 use app\dao\member\MemberTagRelationDao;
-use core\base\BaseService;
-use core\exception\handler\AdminException;
-
+use core\foundation\base\BaseService;
+use core\foundation\exception\handler\AdminException;
 
 class MemberTagRelationService extends BaseService
 {

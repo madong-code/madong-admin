@@ -12,9 +12,7 @@ declare(strict_types=1);
  * Official Website: http://www.madong.tech
  */
 
-
 namespace app\adminapi\schema\request\system;
-
 
 use madong\swagger\schema\BaseRequestDTO;
 use OpenApi\Attributes as OA;

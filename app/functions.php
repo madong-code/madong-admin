@@ -1,10 +1,21 @@
 <?php
+declare(strict_types=1);
+
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 /**
  * Here is your custom functions.
  */
 
-use app\model\system\Admin;
-
+use app\model\system\admin\Admin;
 
 /**
  * 获取时间 N分钟前
@@ -119,5 +130,4 @@ function ensureKeys($keys, $data, $skipKeys = []): array
     }
     return $result;
 }
-
 

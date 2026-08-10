@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -9,14 +11,16 @@
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 namespace app\service\core\plugin;
 
 use app\enum\common\PluginInstallEvent;
+use app\event\plugin\PluginInstalled;
+use app\event\plugin\PluginInstalling;
 use app\process\Monitor;
-use core\exception\handler\PluginException;
-use core\tool\Sse;
-use core\uuid\UUIDGenerator;
+use core\business\plugin\traits\ProgressStreamTrait;
+use core\foundation\exception\handler\PluginException;
+use core\foundation\tool\Sse;
+use core\io\uuid\UUIDGenerator;
 use support\Container;
 
 /**
@@ -24,6 +28,8 @@ use support\Container;
  */
 final class PluginInstallService extends PluginBaseService
 {
+    use ProgressStreamTrait;
+
     public function __construct()
     {
         parent::__construct();
@@ -49,9 +55,9 @@ final class PluginInstallService extends PluginBaseService
             $sessionUuid = $request->input('uuid', $sessionUuid);
         }
 
-        // 检查插件是否已安装（检查 installed.php 文件）
         $pluginDir = $this->plugin_path . DIRECTORY_SEPARATOR . $code;
         $installedConfigFile = $pluginDir . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'installed.php';
+
         if (is_file($installedConfigFile)) {
             yield Sse::warning('插件已安装，跳过安装', ['plugin' => $code], $sessionUuid);
             return;
@@ -127,9 +133,13 @@ final class PluginInstallService extends PluginBaseService
             Monitor::pause();
 
             // 6. 统一调用插件 Install.php 进行安装（这是唯一的安装入口）
-            yield Sse::progress(PluginInstallEvent::EXECUTE_INSTALL_METHOD->label(), 50, [], $sessionUuid);
             $pluginConfig = $this->getPluginConfig($code);
             $version = $pluginConfig['version'] ?? '1.0.0';
+
+            // 派发安装前事件
+            (new PluginInstalling($code, $version))->dispatch();
+
+            yield Sse::progress(PluginInstallEvent::EXECUTE_INSTALL_METHOD->label(), 50, [], $sessionUuid);
 
             // 检查插件是否提供 Install.php
             $className = "plugin\\{$code}\\Install";
@@ -137,39 +147,37 @@ final class PluginInstallService extends PluginBaseService
                 throw new PluginException("插件未提供 Install.php，无法进行安装");
             }
 
+            // 提前验证父类可加载，避免后续 fatal error 导致进程崩溃
+            $reflection = new \ReflectionClass($className);
+            $parentClass = $reflection->getParentClass();
+            if (!$parentClass) {
+                throw new PluginException("插件 Install.php 缺少继承的基类");
+            }
+            $parentName = $parentClass->getName();
+            if (!class_exists($parentName)) {
+                throw new PluginException("插件 Install.php 的父类 {$parentName} 不存在，请检查 use 导入路径");
+            }
+
             // 实例化并执行插件 Install 类（传入进度回调以支持在线模式反馈）
             $installInstance = new $className();
 
-            // 创建临时输出文件
-            $outputFile = runtime_path(self::RUNTIME_PLUGIN_PATH . '/install_' . $sessionUuid . '.log');
-            // 确保目录存在
-            $outputDir = dirname($outputFile);
-            if (!is_dir($outputDir)) {
-                mkdir($outputDir, 0777, true);
-            }
-            file_put_contents($outputFile, '');
+            $installInstance->setContext('default');
 
-            // 定义进度回调，将插件的安装进度实时写入文件
-            $callbackCount = 0;
-            $progressCallback = function(string $message, ?int $progress = null) use ($outputFile, &$callbackCount) {
-                $callbackCount++;
-                $progressStr = $progress !== null ? "(progress: {$progress})" : "(no progress)";
-                $logLine = "[CALLBACK #{$callbackCount}] {$message} {$progressStr}\n";
-                // 写入文件（追加模式），不输出到控制台避免重复
-                file_put_contents($outputFile, $logLine, FILE_APPEND);
-            };
+            // 创建进度记录临时文件
+            $outputFile = $this->createProgressFile('install', $sessionUuid);
+            $progressCallback = $this->createProgressCallback($outputFile);
 
             // 设置进度回调和在线模式
             $installInstance->setProgressCallback($progressCallback);
             $installInstance->setOnlineMode(true);
 
             // 开启输出缓冲，捕获 Install::install() 内部的 echo 输出
-            ob_start();
             try {
-                $installInstance->install($version);
+                $this->captureOutputWithProgress(function() use ($installInstance, $version) {
+                    $installInstance->install($version);
+                }, $outputFile);
             } catch (\Throwable $e) {
-                ob_end_clean();
-                @unlink($outputFile);  // 清理临时文件
+                $this->cleanupProgressFile($outputFile);
                 yield Sse::error('插件安装执行失败: ' . $e->getMessage(), [
                     'exception' => get_class($e),
                     'file' => $e->getFile(),
@@ -177,31 +185,16 @@ final class PluginInstallService extends PluginBaseService
                 ], $sessionUuid);
                 return;
             }
-            $output = ob_get_clean();
-
-            // 将缓冲区输出也写入临时文件
-            if (!empty($output)) {
-                file_put_contents($outputFile, $output, FILE_APPEND);
-            }
 
             // 读取文件内容并 yield 所有日志
-            $fileContent = file_get_contents($outputFile);
-            if (!empty($fileContent)) {
-                $lines = array_filter(explode("\n", $fileContent));
-                foreach ($lines as $line) {
-                    $line = trim($line);
-                    if (!empty($line)) {
-                        yield Sse::progress($line, 50, [], $sessionUuid);
-                    }
-                }
-            }
+            yield from $this->yieldProgressLines($outputFile, 50, [], $sessionUuid);
 
             // 清理临时文件
-            @unlink($outputFile);
+            $this->cleanupProgressFile($outputFile);
 
             yield Sse::progress('插件安装方法执行成功', 85, [], $sessionUuid);
 
-            // 8. 创建安装标记文件
+            // 8. 创建安装标记
             yield Sse::progress('创建安装标记', 90, [], $sessionUuid);
             $installedConfig = [
                 'version' => $pluginConfig['version'] ?? '1.0.0',
@@ -210,14 +203,15 @@ final class PluginInstallService extends PluginBaseService
             file_put_contents($installedConfigFile, '<?php return ' . var_export($installedConfig, true) . ';');
             yield Sse::progress('安装标记创建成功', 95, [], $sessionUuid);
 
-            // 9. 安装完成
+            // 9. 安装完成 - 派发安装后事件
+            (new PluginInstalled($code, $version))->dispatch();
             yield Sse::completed(PluginInstallEvent::INSTALL_COMPLETED->label(), ['plugin' => $code], $sessionUuid);
             Monitor::pause();
 
         } catch (PluginException $e) {
             yield Sse::error($e->getMessage(), [], $sessionUuid);
             return;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             yield Sse::error('安装失败：' . $e->getMessage(), [], $sessionUuid);
             return;
         }
@@ -245,14 +239,14 @@ final class PluginInstallService extends PluginBaseService
         $checks = [];
 
         try {
-            // 1. 核心目录存在性检查（前端目录统一在 frontend 下）
+            // 1. 核心目录存在性检查（模板目录统一在 template 下）
             $coreDirectories = [
                 'admin' => [
-                    'path' => $this->getFrontendProjectPath('admin') . DIRECTORY_SEPARATOR,
+                    'path' => \core\business\plugin\PluginPath::templateProjectPath('admin') . DIRECTORY_SEPARATOR,
                     'name' => 'Admin目录',
                 ],
                 'web'   => [
-                    'path' => $this->getFrontendProjectPath('web') . DIRECTORY_SEPARATOR,
+                    'path' => \core\business\plugin\PluginPath::templateProjectPath('web') . DIRECTORY_SEPARATOR,
                     'name' => 'Web目录',
                 ],
             ];
@@ -282,9 +276,9 @@ final class PluginInstallService extends PluginBaseService
                 }
             }
 
-            // 2. 插件安装目录权限检查（前端目录统一在 frontend 下）
-            $adminPluginDirectory = $this->getFrontendProjectPath('admin') . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'apps' . DIRECTORY_SEPARATOR;
-            $webPluginDirectory   = $this->getFrontendProjectPath('web') . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'apps' . DIRECTORY_SEPARATOR;
+            // 2. 插件安装目录权限检查（与 plugin.php 配置 template 路径一致）
+            $adminPluginDirectory = \core\business\plugin\PluginPath::templateProjectPath('admin') . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'plugin' . DIRECTORY_SEPARATOR;
+            $webPluginDirectory   = \core\business\plugin\PluginPath::templateProjectPath('web') . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'plugin' . DIRECTORY_SEPARATOR;
             $resourceDirectory    = public_path() . DIRECTORY_SEPARATOR;
 
             $permissionChecks = [
@@ -378,8 +372,6 @@ final class PluginInstallService extends PluginBaseService
                     'exception'   => null,
                 ];
             }
-
-
 
             // 3. 插件安装状态检查（检查 installed.php 文件）
             $pluginDir = $this->plugin_path . DIRECTORY_SEPARATOR . $name;

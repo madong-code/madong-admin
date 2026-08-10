@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -13,7 +14,7 @@ declare(strict_types=1);
 
 namespace app\model\plugin;
 
-use core\base\BaseModel;
+use core\foundation\base\BaseModel;
 
 /**
  * 系统插件日志
@@ -23,7 +24,7 @@ use core\base\BaseModel;
  */
 class PluginLog extends BaseModel
 {
-    protected $table = 'plugin_log';
+    protected $table = 'sys_plugin_log';
 
     /**
      * 指示是否自动维护时间戳
@@ -44,4 +45,6 @@ class PluginLog extends BaseModel
         'updated_at',
     ];
 
-}
+    protected $casts = [
+        'id'        => 'string',
+    ];}

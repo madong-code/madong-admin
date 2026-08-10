@@ -1,12 +1,22 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\api\controller\system;
 
 use app\api\controller\Base;
 use app\service\api\system\CaptchaService;
-use core\captcha\Captcha;
-use core\tool\Json;
+use core\security\captcha\Captcha;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
 use OpenApi\Attributes as OA;
@@ -75,6 +85,7 @@ final class CaptchaController extends Base
         ]
     )]
     #[SimpleResponse(schema: [], example: [])]
+    #[AllowAnonymous(requireToken: false, requirePermission: false, description: '公共接口')]
     public function sendSmsCode(string $type): Response
     {
         $result = $this->service->sendSmsCode($type);

@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -7,9 +9,8 @@
  *+------------------
  * Author: Mr. April (405784684@qq.com)
  *+------------------
- * Official Website: https://madong.tech
+ * Official Website: http://www.madong.tech
  */
-
 namespace app\adminapi\schema\response\system;
 
 use madong\swagger\schema\BaseResponseDTO;

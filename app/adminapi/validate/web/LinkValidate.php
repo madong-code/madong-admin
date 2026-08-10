@@ -1,10 +1,20 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\adminapi\validate\web;
 
 use app\model\web\Link;
-use core\base\BaseValidate;
+use core\foundation\base\BaseValidate;
 use Illuminate\Validation\Rule;
 
 /**
@@ -32,7 +42,7 @@ class LinkValidate extends BaseValidate
     /**
      * 验证消息
      */
-    protected array $message = [
+    protected array $messages = [
         'name.required' => '链接名称不能为空',
         'name.max' => '链接名称不能超过50个字符',
         'name.unique' => '链接名称已存在',
@@ -50,7 +60,7 @@ class LinkValidate extends BaseValidate
     /**
      * 验证场景
      */
-    protected array $scene = [
+    protected array $scenes = [
         'store' => [
             'name',
             'url',

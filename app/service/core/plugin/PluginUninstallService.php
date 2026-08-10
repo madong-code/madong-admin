@@ -15,8 +15,11 @@ declare(strict_types=1);
 
 namespace app\service\core\plugin;
 
-use core\tool\Sse;
-use core\uuid\UUIDGenerator;
+use app\event\plugin\PluginUninstalled;
+use app\event\plugin\PluginUninstalling;
+use core\business\plugin\traits\ProgressStreamTrait;
+use core\foundation\tool\Sse;
+use core\io\uuid\UUIDGenerator;
 use support\Container;
 
 /**
@@ -27,6 +30,7 @@ use support\Container;
  */
 class PluginUninstallService extends PluginBaseService
 {
+    use ProgressStreamTrait;
     /**
      * 卸载插件（统一入口）
      * 卸载流程统一使用插件自带的 Install.php
@@ -68,74 +72,69 @@ class PluginUninstallService extends PluginBaseService
             return;
         }
 
+        // 提前验证父类可加载，避免后续 fatal error 导致进程崩溃
         try {
+            $reflection = new \ReflectionClass($className);
+            $parentClass = $reflection->getParentClass();
+            if ($parentClass) {
+                $parentName = $parentClass->getName();
+                if (!class_exists($parentName)) {
+                    yield Sse::error("插件 Install.php 的父类 {$parentName} 不存在，请检查 use 导入路径", [], $sessionUuid);
+                    return;
+                }
+            }
+        } catch (\ReflectionException $e) {
+            yield Sse::error('插件 Install.php 类反射检查失败：' . $e->getMessage(), [], $sessionUuid);
+            return;
+        }
+
+        try {
+            $version = $pluginConfig['version'] ?? '1.0.0';
+
             // 发送卸载开始事件
             yield Sse::progress('开始卸载插件', 10, ['plugin' => $code], $sessionUuid);
 
+            // 派发卸载前事件
+            (new PluginUninstalling($code, $version))->dispatch();
+
             // 统一调用插件的 Install::uninstall() 方法（这是唯一的卸载入口）
             yield Sse::progress('执行插件卸载逻辑', 30, [], $sessionUuid);
-            $version = $pluginConfig['version'] ?? '1.0.0';
 
             // 实例化并执行插件 Install 类（传入进度回调以支持在线模式反馈）
             $installInstance = new $className();
 
-            // 创建临时输出文件（类似 Terminal 的方式）
-            $outputFile = runtime_path(self::RUNTIME_PLUGIN_PATH . '/uninstall_' . $sessionUuid . '.log');
-            // 确保目录存在
-            $outputDir = dirname($outputFile);
-            if (!is_dir($outputDir)) {
-                mkdir($outputDir, 0777, true);
-            }
-            file_put_contents($outputFile, '');
+            $installInstance->setContext('default');
 
-            // 定义进度回调，将插件的卸载进度实时写入文件
-            $callbackCount    = 0;
-            $progressCallback = function (string $message, ?int $progress = null) use ($outputFile, &$callbackCount) {
-                $callbackCount++;
-                $progressStr = $progress !== null ? "(progress: {$progress})" : "(no progress)";
-                $logLine     = "[CALLBACK #{$callbackCount}] {$message} {$progressStr}\n";
-                // 写入文件（追加模式）
-                file_put_contents($outputFile, $logLine, FILE_APPEND);
-            };
+            // 创建进度记录临时文件
+            $outputFile = $this->createProgressFile('uninstall', $sessionUuid);
+            $progressCallback = $this->createProgressCallback($outputFile);
 
             // 设置进度回调和在线模式
             $installInstance->setProgressCallback($progressCallback);
             $installInstance->setOnlineMode(true);
 
             // 开启输出缓冲，捕获 Install::uninstall() 内部的 echo 输出
-            ob_start();
-            $installInstance->uninstall($version);
-            $output = ob_get_clean();
-
-            // 将缓冲区输出也写入临时文件
-            if (!empty($output)) {
-                file_put_contents($outputFile, $output, FILE_APPEND);
-            }
+            $this->captureOutputWithProgress(function() use ($installInstance, $version) {
+                $installInstance->uninstall($version);
+            }, $outputFile);
 
             // 读取文件内容并 yield 所有日志
-            $fileContent = file_get_contents($outputFile);
-            if (!empty($fileContent)) {
-                $lines = array_filter(explode("\n", $fileContent));
-                foreach ($lines as $line) {
-                    $line = trim($line);
-                    if (!empty($line)) {
-                        // 使用 Sse::progress 统一输出，不更新进度值
-                        yield Sse::progress($line, 30, [], $sessionUuid);
-                    }
-                }
-            }
+            yield from $this->yieldProgressLines($outputFile, 30, [], $sessionUuid);
 
             // 清理临时文件
-            @unlink($outputFile);
+            $this->cleanupProgressFile($outputFile);
 
             yield Sse::progress('插件卸载方法执行成功', 80, [], $sessionUuid);
 
-            // 删除插件内的安装配置
+            // 删除 installed.php
             yield Sse::progress('删除安装配置', 90, [], $sessionUuid);
             $installedConfigPath = $this->plugin_path . DIRECTORY_SEPARATOR . $code . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'installed.php';
             if (is_file($installedConfigPath)) {
                 @unlink($installedConfigPath);
             }
+
+            // 派发卸载后事件
+            (new PluginUninstalled($code, $version))->dispatch();
 
             // 发送卸载完成事件
             yield Sse::completed('插件卸载成功', ['plugin' => $code], $sessionUuid);
@@ -226,7 +225,10 @@ class PluginUninstallService extends PluginBaseService
                 $model->delete();
             }
         } catch (\Throwable $e) {
-
+            \support\Log::error('插件卸载删除记录失败: ' . $e->getMessage(), [
+                'plugin'    => $code,
+                'exception' => $e,
+            ]);
         }
     }
 }

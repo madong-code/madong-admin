@@ -1,10 +1,19 @@
 <?php
-
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\adminapi\validate\profile;
 
-use core\base\BaseValidate;
+use core\foundation\base\BaseValidate;
 
 /**
  * 个人中心验证器
@@ -59,7 +68,7 @@ final class ProfileValidate extends BaseValidate
         ];
     }
 
-    protected array $scene = [
+    protected array $scenes = [
         'update-profile'  => [
             'real_name',
             'nick_name',

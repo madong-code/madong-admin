@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -20,13 +22,14 @@ use app\adminapi\middleware\PermissionMiddleware;
 use app\adminapi\schema\request\system\MenuFormRequest;
 use app\adminapi\schema\request\system\MenuQueryRequest;
 use app\adminapi\schema\response\system\MenuResponse;
-use app\adminapi\validate\system\MenuValidate;
+use app\adminapi\validate\system\menu\MenuValidate;
 use app\schema\request\BatchDeleteRequest;
 use app\scope\global\AccessPermissionScope;
-use app\service\admin\system\MenuService;
+use app\service\admin\system\menu\MenuService;
 use app\service\core\plugin\PluginService;
-use core\exception\handler\AdminException;
-use core\tool\Json;
+use core\foundation\exception\handler\AdminException;
+use core\foundation\tool\Json;
+use madong\helper\Arr;
 use madong\swagger\annotation\response\PageResponse;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\Permission;
@@ -92,11 +95,9 @@ final class MenuController extends Crud
         ]
     )]
     #[Permission(code: 'system:menu:create')]
-    #[SimpleResponse(schema:[],example: [])]
+    #[SimpleResponse(schema: [], example: [])]
     public function store(Request $request): \support\Response
     {
-        $this->service->cacheDriver()->delete(MenuService::CACHE_ALL_AUTHS_DATA);
-        $this->service->cacheDriver()->delete(MenuService::CACHE_ALL_MENUS_DATA);
         return parent::store($request);
     }
 
@@ -116,7 +117,7 @@ final class MenuController extends Crud
         schema: new OA\Schema(type: 'string', example: 1)
     )]
     #[Permission(code: 'system:menu:update')]
-    #[SimpleResponse(schema:[],example: [])]
+    #[SimpleResponse(schema: [], example: [])]
     public function update(Request $request): \support\Response
     {
         try {
@@ -138,7 +139,7 @@ final class MenuController extends Crud
         ]
     )]
     #[Permission(code: 'system:menu:delete')]
-    #[SimpleResponse(schema:[],example: [])]
+    #[SimpleResponse(schema: [], example: [])]
     public function destroy(Request $request): \support\Response
     {
         try {
@@ -147,9 +148,24 @@ final class MenuController extends Crud
                 throw new AdminException('参数错误');
             }
             $result = $this->service->batchDelete($data);
-            $this->service->cacheDriver()->delete(MenuService::CACHE_ALL_AUTHS_DATA);
-            $this->service->cacheDriver()->delete(MenuService::CACHE_ALL_MENUS_DATA);
             return Json::success('ok', $result);
+        } catch (\Throwable $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    #[OA\Delete(
+        path: '/system/menu/{id}', 
+        summary: '删除菜单模板',
+         tags: ['菜单模板']
+    )]
+    #[SimpleResponse(schema: [], example: [])]
+    public function delete(Request $request): \support\Response
+    {
+        try {
+            $id = $request->route->param('id');
+            $this->service->batchDelete(Arr::normalize($id));
+            return Json::success('删除成功');
         } catch (\Throwable $e) {
             return Json::fail($e->getMessage());
         }
@@ -162,7 +178,7 @@ final class MenuController extends Crud
     )]
     #[Permission(code: 'system:menu:batch_store')]
     #[RequestBody(required: true, content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: MenuFormRequest::class)))]
-    #[SimpleResponse(schema:[],example: [])]
+    #[SimpleResponse(schema: [], example: [])]
     public function batchStore(Request $request): \support\Response
     {
         try {
@@ -179,8 +195,6 @@ final class MenuController extends Crud
             foreach ($data as $item) {
                 $this->service->save($item);
             }
-            $this->service->cacheDriver()->delete(MenuService::CACHE_ALL_AUTHS_DATA);
-            $this->service->cacheDriver()->delete(MenuService::CACHE_ALL_MENUS_DATA);
             return Json::success('ok');
         } catch (\Exception $e) {
             return Json::fail($e->getMessage());
@@ -193,7 +207,7 @@ final class MenuController extends Crud
         tags: ['菜单管理'],
     )]
     #[Permission(code: 'system:menu:app_list')]
-    #[SimpleResponse(schema:[],example: [])]
+    #[SimpleResponse(schema: [], example: [])]
     public function appList(Request $request): \support\Response
     {
         try {
@@ -218,5 +232,4 @@ final class MenuController extends Crud
         }
         return Json::success('ok', $formatted_items);
     }
-
 }

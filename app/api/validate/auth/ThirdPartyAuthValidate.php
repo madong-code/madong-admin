@@ -1,11 +1,20 @@
 <?php
-
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\api\validate\auth;
 
 use app\enum\member\ThirdPartyPlatform;
-use core\base\BaseValidate;
+use core\foundation\base\BaseValidate;
 
 /**
  * 绑定验证器
@@ -32,7 +41,7 @@ class ThirdPartyAuthValidate extends BaseValidate
     /**
      * 验证消息
      */
-    protected array $message = [
+    protected array $messages = [
         'platform.required' => '平台类型不能为空',
         'platform.integer' => '平台类型必须是整数',
         'openid.required' => 'OpenID不能为空',
@@ -53,7 +62,7 @@ class ThirdPartyAuthValidate extends BaseValidate
     /**
      * 验证场景
      */
-    protected array $scene = [
+    protected array $scenes = [
         'bind' => ['platform', 'openid', 'unionid', 'nickname', 'avatar', 'gender', 'country', 'province', 'city', 'access_token', 'refresh_token'],
         'qrCode' => ['platform'],
     ];

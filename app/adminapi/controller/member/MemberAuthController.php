@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -24,7 +25,7 @@ use app\service\admin\member\MemberService;
 use app\service\admin\member\MemberTagPermissionService;
 use app\service\admin\member\MemberTagRelationService;
 use madong\swagger\attribute\Permission;
-use core\tool\Json;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use OpenApi\Attributes as OA;
 use support\Container;
@@ -139,7 +140,6 @@ final class MemberAuthController extends Crud
             return Json::fail($e->getMessage(), [], $e->getCode());
         }
     }
-
 
     #[OA\Post(
         path: '/member/auth/save-tag-menu',

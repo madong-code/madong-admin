@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -13,10 +14,9 @@ declare(strict_types=1);
 
 namespace app\service\api\system;
 
-use app\dao\system\ConfigDao;
+use app\dao\system\config\ConfigDao;
 use app\scope\global\AccessPermissionScope;
-use core\base\BaseService;
-
+use core\foundation\base\BaseService;
 
 class ConfigService extends BaseService
 {
@@ -39,35 +39,55 @@ class ConfigService extends BaseService
     public function config(string $code, mixed $default = [], array $options = []): mixed
     {
         $map = ['code' => $code];
-        // 如果选项中有分组，则添加到查询条件
-        if (!empty($options['group_code'])) {
-            $map['group_code'] = $options['group_code'];
+        $fallbackGroups = $options['fallback_groups'] ?? [];
+        $primaryGroup   = $options['group_code'] ?? '';
+
+        // 如果指定了主分组，优先在该分组中查询
+        if (!empty($primaryGroup)) {
+            $map['group_code'] = $primaryGroup;
         }
-        
+
         // 查询配置
         $configModel = $this->dao->get($map, ['*'], [], '', [AccessPermissionScope::class]);
-        
-        // 如果配置不存在，自动创建
+
+        // 主分组未找到且配置了 fallback 分组，逐个回退查找
+        if (!$configModel && !empty($fallbackGroups) && is_array($fallbackGroups)) {
+            foreach ($fallbackGroups as $fbGroup) {
+                if ($fbGroup === $primaryGroup) {
+                    continue;
+                }
+                $configModel = $this->dao->get(
+                    ['code' => $code, 'group_code' => $fbGroup],
+                    ['*'], [], '', [AccessPermissionScope::class]
+                );
+                if ($configModel) {
+                    break;
+                }
+            }
+        }
+
+        // 如果配置不存在，自动创建到主分组或 default
         if (!$configModel) {
+            $targetGroup = $primaryGroup ?: 'default';
             $configData = [
                 'code' => $code,
                 'name' => $options['name'] ?? $code,
-                'group_code' => $options['group_code'] ?? 'default',
+                'group_code' => $targetGroup,
                 'content' => is_array($default) ? json_encode($default, JSON_UNESCAPED_UNICODE) : $default,
                 'type' => $options['type'] ?? (is_array($default) ? 'json' : 'string'),
                 'enabled' => 1,
                 'sort' => 0,
                 'remark' => $options['remark'] ?? '',
             ];
-            
+
             try {
                 $this->dao->save($configData);
             } catch (\Exception $e) {
             }
-            
+
             return $default;
         }
-        
+
         $content = $configModel->getOriginal('content',null);
 
         // 如果content是数组/JSON格式，返回整个数组；否则返回原值

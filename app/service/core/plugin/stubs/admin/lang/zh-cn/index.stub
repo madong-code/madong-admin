@@ -1,19 +1,8 @@
 {
-  "{{pluginName}}": {
-    "title": "{{pluginTitle}}",
-    "description": "{{pluginDescription}}",
-    "list": "列表",
-    "add": "添加",
-    "edit": "编辑",
-    "delete": "删除",
-    "detail": "详情",
-    "save": "保存",
-    "cancel": "取消",
-    "search": "搜索",
-    "reset": "重置",
-    "confirm": "确认",
-    "success": "操作成功",
-    "error": "操作失败",
-    "loading": "加载中..."
-  }
+  "title": "{{pluginTitle}}",
+  "name": "名称",
+  "status": "状态",
+  "sort": "排序",
+  "remark": "备注",
+  "created_at": "创建时间"
 }

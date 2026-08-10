@@ -6,4 +6,8 @@ return [
     'controller_suffix' => 'Controller',
     'controller_reuse'  => false,
     'version'           => '1.0.0',
+    'title'             => '{{pluginTitle}}',
+    'description'       => '{{pluginDescription}}',
+    'author'            => 'Your Name',
+    'type'              => 'madong:app',
 ];

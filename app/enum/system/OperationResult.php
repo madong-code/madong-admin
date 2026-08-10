@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -31,7 +32,6 @@ enum OperationResult:int
             self::FAILURE => '失败'
         };
     }
-
 
     public function color():string{
          return match($this) {

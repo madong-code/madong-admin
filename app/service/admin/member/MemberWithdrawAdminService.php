@@ -1,11 +1,21 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\service\admin\member;
 
 use app\dao\member\MemberWithdrawDao;
 use app\enum\member\WithdrawStatus;
-use core\base\BaseService;
+use core\foundation\base\BaseService;
 
 /**
  * 提现管理服务

@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  *+------------------
@@ -8,14 +9,14 @@
  *+------------------
  * Author: Mr. April (405784684@qq.com)
  *+------------------
- * Official Website: https://madong.tech
+ * Official Website: http://www.madong.tech
  */
 namespace app\enum\terminal;
 
-use core\interface\IEnum;
+use core\foundation\interface\IEnum;
 
 /**
- * 命令任务任务枚举类
+ * 命令任务枚举类
  *
  * @author Mr.April
  * @since  1.0

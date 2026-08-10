@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -15,6 +16,7 @@ namespace app\command\plugin;
 
 use app\command\BaseCommand;
 use app\service\core\plugin\PluginDevelopService;
+use support\Container;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -64,8 +66,8 @@ class DevelopCreateCommand extends BaseCommand
         $io->info(sprintf("Plugin description: %s", $pluginDescription));
 
         try {
-            // 创建插件开发服务实例
-            $pluginDevelopService = new PluginDevelopService();
+            // 通过容器获取插件开发服务实例
+            $pluginDevelopService = Container::get(PluginDevelopService::class);
 
             // 生成插件模板
             $result = $pluginDevelopService->generatePluginTemplate($pluginName, $pluginTitle, $pluginDescription);

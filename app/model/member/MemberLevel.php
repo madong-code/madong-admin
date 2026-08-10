@@ -1,10 +1,19 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\model\member;
 
-use core\base\BaseModel;
-
+use core\foundation\base\BaseModel;
 
 /**
  * 会员等级模型
@@ -39,12 +48,15 @@ class MemberLevel extends BaseModel
         'updated_at',
     ];
 
+    protected $casts = [
+        'id'        => 'string',
+    ];
+
     /**
      * 追加字段
      */
     protected $appends = [
     ];
-
 
     /**
      * 关联会员

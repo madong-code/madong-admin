@@ -1,12 +1,22 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\service\admin\member;
 
 use app\dao\member\MemberBillDao;
 use app\dao\member\MemberDao;
-use core\base\BaseService;
-use core\exception\handler\AdminException;
+use core\foundation\base\BaseService;
+use core\foundation\exception\handler\AdminException;
 
 /**
  * 会员账单服务类
@@ -64,7 +74,7 @@ class MemberBillService extends BaseService
             $this->dao->getModel()->getConnection()->commit();
             return $bill->toArray();
         } catch (\Exception $e) {
-            throw new AdminException($e->getMessage(), ['errorCode' => $e->getCode() ?: -1]);
+            throw new AdminException($e->getMessage(), [], $e->getCode());
         }
     }
 

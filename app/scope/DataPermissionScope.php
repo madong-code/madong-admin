@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  *+------------------
@@ -8,14 +9,13 @@
  *+------------------
  * Author: Mr. April (405784684@qq.com)
  *+------------------
- * Official Website: https://madong.tech
+ * Official Website: http://www.madong.tech
  */
-
 namespace app\scope;
 
 use app\adminapi\CurrentUser;
 use app\enum\system\DataPermission;
-use app\service\admin\org\DeptService;
+use app\service\admin\system\org\DeptService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
@@ -237,7 +237,7 @@ class DataPermissionScope implements Scope
         if (empty($request)) {
             return null;
         }
-        $tokenName     = config('core.jwt.app.token_name', 'Authorization');
+        $tokenName     = config('core.security.jwt.token_name', 'Authorization');
         $authorization = $request->header($tokenName);
         if (empty($authorization) || $authorization === 'undefined') {
             $authorization = $request->get('token');

@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace DummyNamespace;
 
 use app\dao\DummyDao;
-use core\base\BaseService;
+use core\foundation\base\BaseService;
 
 /**
  * DummyClass服务类

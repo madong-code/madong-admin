@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -21,7 +22,7 @@ use app\adminapi\validate\member\MemberTagValidate;
 use app\schema\request\BatchDeleteRequest;
 use app\schema\request\IdRequest;
 use app\service\admin\member\MemberTagService;
-use core\tool\Json;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\Permission;
 use OpenApi\Attributes as OA;
@@ -175,13 +176,121 @@ final class TagController extends Crud
         return parent::destroy($request);
     }
 
-    #[OA\Put(
-        path: '/member/{id}/permissions',
-        summary: '为标签分配权限',
+    // ================ 成员管理接口 ================
+
+    #[OA\Get(
+        path: '/member/tag/{tagId}/members',
+        summary: '获取标签下的会员列表',
+        tags: ['会员标签'],
+        parameters: [
+            new OA\Parameter(name: "tagId", description: "标签ID", in: "path", required: true, schema: new OA\Schema(type: "integer")),
+            new OA\Parameter(name: "page", description: "页码", in: "query", schema: new OA\Schema(type: "integer")),
+            new OA\Parameter(name: "limit", description: "每页数量", in: "query", schema: new OA\Schema(type: "integer")),
+            new OA\Parameter(name: "username", description: "用户名", in: "query", schema: new OA\Schema(type: "string")),
+            new OA\Parameter(name: "nickname", description: "昵称", in: "query", schema: new OA\Schema(type: "string")),
+        ],
+    )]
+    #[Permission("member:tag:member_list")]
+    public function getTagMembers(Request $request, $tagId): \support\Response
+    {
+        try {
+            $params = $request->all();
+            $result = $this->service->getTagMembers((int)$tagId, $params);
+            return Json::success('ok', $result);
+        } catch (\Exception $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    #[OA\Get(
+        path: '/member/tag/{tagId}/excluded-members',
+        summary: '获取未包含在该标签下的会员列表',
+        tags: ['会员标签'],
+        parameters: [
+            new OA\Parameter(name: "tagId", description: "标签ID", in: "path", required: true, schema: new OA\Schema(type: "integer")),
+            new OA\Parameter(name: "page", description: "页码", in: "query", schema: new OA\Schema(type: "integer")),
+            new OA\Parameter(name: "limit", description: "每页数量", in: "query", schema: new OA\Schema(type: "integer")),
+            new OA\Parameter(name: "username", description: "用户名", in: "query", schema: new OA\Schema(type: "string")),
+            new OA\Parameter(name: "nickname", description: "昵称", in: "query", schema: new OA\Schema(type: "string")),
+        ],
+    )]
+    #[Permission("member:tag:member_list")]
+    public function getExcludedMembers(Request $request, $tagId): \support\Response
+    {
+        try {
+            $params = $request->all();
+            $result = $this->service->getExcludedMembers((int)$tagId, $params);
+            return Json::success('ok', $result);
+        } catch (\Exception $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    #[OA\Post(
+        path: '/member/tag/batch-assign',
+        summary: '批量分配/移除标签成员',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(properties: [
-                new OA\Property(property: "permissions", type: "array", items: new OA\Items(type: "string"), example: ["developer", "api_access"]),
+                new OA\Property(property: "tag_id", type: "integer", example: 1),
+                new OA\Property(property: "member_ids", type: "array", items: new OA\Items(type: "integer"), example: [1, 2, 3]),
+                new OA\Property(property: "action", type: "string", example: "assign", description: "assign=分配, remove=移除"),
+            ])
+        ),
+        tags: ['会员标签'],
+    )]
+    #[Permission("member:tag:assign_members")]
+    public function batchAssign(Request $request): \support\Response
+    {
+        try {
+            $tagId = (int)$request->input('tag_id', 0);
+            $memberIds = $request->input('member_ids', []);
+            $action = $request->input('action', 'assign');
+
+            $data = [
+                'tag_ids' => [$tagId],
+                'member_ids' => $memberIds,
+                'action' => $action,
+            ];
+            $this->service->batchAssignTags($data);
+            return Json::success('操作成功');
+        } catch (\Exception $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    // ================ 菜单授权接口 ================
+
+    #[OA\Get(
+        path: '/member/tag/{id}/menu-ids',
+        summary: '获取标签已授权的菜单ID列表',
+        tags: ['会员标签'],
+        parameters: [
+            new OA\Parameter(name: "id", description: "标签ID", in: "path", required: true, schema: new OA\Schema(type: "integer")),
+        ],
+    )]
+    #[Permission("member:tag:show_permissions")]
+    public function getTagMenuIds(Request $request, $id): \support\Response
+    {
+        try {
+            $tag = $this->service->get($id, ['*'], ['permissions']);
+            if (!$tag) {
+                return Json::fail('标签不存在');
+            }
+            $menuIds = $tag->permissions->pluck('id')->toArray();
+            return Json::success('ok', $menuIds);
+        } catch (\Exception $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    #[OA\Put(
+        path: '/member/{id}/permissions',
+        summary: '为标签分配菜单权限（通过菜单ID）',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(properties: [
+                new OA\Property(property: "menu_ids", type: "array", items: new OA\Items(type: "integer"), example: [1, 2, 3]),
             ])
         ),
         tags: ['会员标签'],
@@ -194,8 +303,8 @@ final class TagController extends Crud
     public function assignPermissions(Request $request, $id): \support\Response
     {
         try {
-            $permissions = $request->input('permissions', []);
-            $this->service->assignPermissions($id, $permissions);
+            $menuIds = $request->input('menu_ids', []);
+            $this->service->saveTagMenuIds((int)$id, $menuIds);
             return Json::success('权限分配成功');
         } catch (\Exception $e) {
             return Json::fail($e->getMessage());
@@ -204,7 +313,7 @@ final class TagController extends Crud
 
     #[OA\Get(
         path: '/member/{id}/permissions',
-        summary: '获取标签权限',
+        summary: '获取标签的已授权菜单',
         tags: ['会员标签'],
         parameters: [
             new OA\Parameter(name: "id", description: "标签ID", in: "path", required: true, schema: new OA\Schema(type: "integer")),

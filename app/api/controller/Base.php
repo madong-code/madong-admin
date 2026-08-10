@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -9,11 +11,10 @@
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 namespace app\api\controller;
 
-use core\base\BaseController;
-use core\tool\Json;
+use core\foundation\base\BaseController;
+use core\foundation\tool\Json;
 use madong\helper\Tree;
 
 /**

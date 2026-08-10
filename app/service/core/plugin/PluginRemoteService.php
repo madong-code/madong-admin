@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -9,10 +11,9 @@
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 namespace app\service\core\plugin;
 
-use core\exception\handler\AdminException;
+use core\foundation\exception\handler\AdminException;
 use madong\helper\Dict;
 
 /**
@@ -39,7 +40,7 @@ final class PluginRemoteService extends PluginBaseService
             'base_uri'        => $baseUri,
             'timeout'         => 60,
             'connect_timeout' => 5,
-            'verify'          => false,
+            'verify'          => config('madong.market_verify_ssl', true),
             'http_errors'     => false,
             'headers'         => [
                 'Referer'    => \request()->fullUrl() ?? '',
@@ -47,6 +48,20 @@ final class PluginRemoteService extends PluginBaseService
                 'Accept'     => 'application/json;charset=UTF-8',
             ],
         ]);
+    }
+
+    /**
+     * 生成 API 签名
+     * 使用 HMAC-SHA256，兼容配置回退到 MD5
+     */
+    private function generateSign(string $authCode, string $authSecret): string
+    {
+        $payload = $authCode . $authSecret . (string) time();
+        $algo    = config('madong.market_sign_algo', 'hmac-sha256');
+        return match ($algo) {
+            'hmac-sha256' => hash_hmac('sha256', $payload, $authSecret),
+            default       => md5($payload),
+        };
     }
 
     /**
@@ -109,7 +124,7 @@ final class PluginRemoteService extends PluginBaseService
         try {
             $client = $this->createHttpClient($args['market_host']);
 
-            $sign = md5($args['auth_code'] . $args['auth_secret'] . (string)time());
+            $sign = $this->generateSign($args['auth_code'], $args['auth_secret']);
             $response = $client->get('/api/madong/apps', [
                 'query' => [
                     'auth_code'   => $args['auth_code'],
@@ -198,7 +213,7 @@ final class PluginRemoteService extends PluginBaseService
         try {
             $client = $this->createHttpClient($args['market_host']);
 
-            $sign = md5($args['auth_code'] . $args['auth_secret'] . (string)time());
+            $sign = $this->generateSign($args['auth_code'], $args['auth_secret']);
             $response = $client->get('/api/madong/apps', [
                 'query' => [
                         'auth_code'   => $args['auth_code'],
@@ -291,7 +306,7 @@ final class PluginRemoteService extends PluginBaseService
         try {
             $client = $this->createHttpClient($args['market_host']);
 
-            $sign = md5($args['auth_code'] . $args['auth_secret'] . (string)time());
+            $sign = $this->generateSign($args['auth_code'], $args['auth_secret']);
             
             // 记录请求参数
             \support\Log::info('getRemoteDownloadServiceFromRemote 请求参数', [
@@ -376,40 +391,33 @@ final class PluginRemoteService extends PluginBaseService
      * @param string $secretKey 密钥
      *
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
      * @throws \core\exception\handler\AdminException
      */
     public function verifyRemoteAuthorization(string $authCode, string $secretKey): array
     {
-        try {
-            $config = [
-                'auth_code'   => $authCode,
-                'auth_secret' => $secretKey,
-                'market_host' => config('madong.market_host', 'https://madong.tech'),
-            ];
+        $config = [
+            'auth_code'   => $authCode,
+            'auth_secret' => $secretKey,
+            'market_host' => config('madong.market_host', 'https://madong.tech'),
+        ];
 
-            // 所有请求都通过远程 curl 获取
-            return $this->verifyRemoteAuthorizationFromRemote($config);
-        } catch (\Exception $e) {
-            throw new AdminException($e->getMessage());
-        }
+        return $this->doVerifyRemoteAuthorization($config);
     }
 
     /**
-     * 从远程验证授权
+     * 执行远程授权验证
      *
      * @param array $args
      *
      * @return array
-     * @throws \GuzzleHttp\Exception\GuzzleException
      * @throws \core\exception\handler\AdminException
      */
-    private function verifyRemoteAuthorizationFromRemote(array $args): array
+    private function doVerifyRemoteAuthorization(array $args): array
     {
         try {
             $client = $this->createHttpClient($args['market_host']);
 
-            $sign = md5($args['auth_code'] . $args['auth_secret'] . (string)time());
+            $sign = $this->generateSign($args['auth_code'], $args['auth_secret']);
             $response = $client->get('/api/madong/authorization/verify', [
                 'query' => [
                     'auth_code'   => $args['auth_code'],
@@ -422,7 +430,7 @@ final class PluginRemoteService extends PluginBaseService
             $content = $response->getBody()->getContents();
             $data    = json_decode($content, true);
 
-            // 如果返回格式错误，记录日志
+            // 如果返回格式错误
             if (json_last_error() !== JSON_ERROR_NONE) {
                 throw new \Exception('JSON解析失败: ' . json_last_error_msg());
             }
@@ -434,7 +442,7 @@ final class PluginRemoteService extends PluginBaseService
 
             // 检查返回的code是否为0
             if (isset($data['code']) && $data['code'] !== 0) {
-                throw new \Exception($data['msg'] ?? '授权验证失败');
+                throw new \Exception('授权验证失败: ' . ($data['msg'] ?? '未知错误'));
             }
 
             // 确保返回的是授权验证数据
@@ -443,6 +451,20 @@ final class PluginRemoteService extends PluginBaseService
             }
 
             return $data;
+        } catch (\GuzzleHttp\Exception\ConnectException $e) {
+            $message = $e->getMessage();
+            if (str_contains($message, 'Could not resolve host')) {
+                throw new AdminException('无法连接到授权服务器（域名解析失败），请检查网络连接');
+            }
+            if (str_contains($message, 'Connection timed out')) {
+                throw new AdminException('连接授权服务器超时，请检查网络连接');
+            }
+            if (str_contains($message, 'Connection refused')) {
+                throw new AdminException('授权服务器连接被拒绝');
+            }
+            throw new AdminException('远程授权服务器连接失败: ' . $message);
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            throw new AdminException('远程授权请求失败: ' . $e->getMessage());
         } catch (\Exception $e) {
             throw new AdminException($e->getMessage());
         }
@@ -489,7 +511,7 @@ final class PluginRemoteService extends PluginBaseService
         try {
             $client = $this->createHttpClient($args['market_host']);
 
-            $sign = md5($args['auth_code'] . $args['auth_secret'] . (string)time());
+            $sign = $this->generateSign($args['auth_code'], $args['auth_secret']);
             $response = $client->get('/api/madong/apps/update-logs', [
                 'query' => [
                     'auth_code'   => $args['auth_code'],

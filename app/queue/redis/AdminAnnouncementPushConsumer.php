@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -13,14 +14,14 @@ declare(strict_types=1);
 
 namespace app\queue\redis;
 
+use app\adminapi\event\content\MessagePushEvent;
 use app\enum\system\BusinessPlatform;
 use app\enum\system\MessageEvent;
 use app\enum\system\MessageType;
 use app\service\system\SysAdminService;
-use core\logger\Logger;
-use core\notify\enum\PushClientType;
-use core\notify\Notification;
-use Webman\RedisQueue\Consumer;
+use core\infrastructure\logger\Logger;
+use core\communication\notify\enum\PushClientType;
+use core\foundation\base\BaseQueueConsumer;
 
 /**
  * 推送公告-后台
@@ -28,43 +29,24 @@ use Webman\RedisQueue\Consumer;
  * @author Mr.April
  * @since  1.0
  */
-class AdminAnnouncementPushConsumer implements Consumer
+class AdminAnnouncementPushConsumer extends BaseQueueConsumer
 {
     public string $queue = 'admin-announcement-push';
-    public string $connection = 'default';
 
-    /**
-     * 消费公告推送消息
-     *
-     * @param array $data 消息数据
-     *
-     * @return bool
-     * @throws \Throwable
-     */
-    public function consume($data): bool
+    protected function handle(array $data): void
     {
-        try {
-            Logger::debug('公告推送开始', $data);
+        Logger::debug('公告推送开始', $data);
 
-            // 1. 验证必要参数
-            $this->validateData($data);
+        // 1. 验证必要参数
+        $this->validateData($data);
 
-            // 2. 获取目标用户ID列表
-            $adminIds = $this->getTargetAdminIds($data['uuid'] ?? null);
+        // 2. 获取目标用户ID列表
+        $adminIds = $this->getTargetAdminIds($data['uuid'] ?? null);
 
-            // 3. 构建并发送通知
-            $this->sendNotifications($adminIds, $data, '*');
+        // 3. 构建并发送通知
+        $this->sendNotifications($adminIds, $data);
 
-            Logger::debug("公告推送完成: {$data['title']}");
-            return true;
-        } catch (\Throwable $e) {
-            var_dump($e->getMessage());
-            Logger::error("公告推送失败: " . $e->getMessage(), [
-                'error' => $e->getTraceAsString(),
-                'data'  => $data,
-            ]);
-            throw $e;
-        }
+        Logger::debug("公告推送完成: {$data['title']}");
     }
 
     /**
@@ -120,33 +102,38 @@ class AdminAnnouncementPushConsumer implements Consumer
      *
      * @param array      $adminIds
      * @param array      $data
-     * @param int|string $tenantId
      */
-    private function sendNotifications(array $adminIds, array $data, int|string $tenantId = '*'): void
+    private function sendNotifications(array $adminIds, array $data): void
     {
         if (empty($adminIds)) {
-            Logger::warning('没有符合条件的目标用户', ['tenant_id' => $tenantId]);
+            Logger::warning('没有符合条件的目标用户');
             return;
         }
 
-        $sendData = [];
         foreach ($adminIds as $id) {
-            $sendData[] = [
-                'module'       => BusinessPlatform::ADMIN->value,
-                'receiver_id'  => $id,
-                'event'        => MessageEvent::DEFAULT->value,
-                'data'         => [],
+            $messageData = [
                 'title'        => $data['title'],
                 'content'      => $data['content'],
                 'message_type' => MessageEvent::DEFAULT->value,
                 'priority'     => 1,
                 'related_id'   => $data['id'] ?? '',
-                'related_type'=> MessageType::ANNOUNCEMENT->value,
+                'related_type' => MessageType::ANNOUNCEMENT->value,
                 'expired_at'   => time() + 86400 * 7,
                 'message_uuid' => $data['uuid'] ?? null,
+                'category_key' => 'announcement',
             ];
-        }
 
-        Notification::batchSend(PushClientType::BACKEND, $tenantId ?? '*', $sendData);
+            (new MessagePushEvent(
+                PushClientType::BACKEND,
+                BusinessPlatform::ADMIN->value,
+                '*',
+                $id,
+                MessageEvent::DEFAULT->value,
+                [],
+                $messageData,
+                null,
+                'announcement'
+            ))->dispatch();
+        }
     }
 }

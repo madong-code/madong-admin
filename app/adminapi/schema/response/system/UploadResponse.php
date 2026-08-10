@@ -1,6 +1,16 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\adminapi\schema\response\system;
 
 use madong\swagger\schema\BaseResponseDTO;
@@ -80,7 +90,7 @@ class UploadResponse extends BaseResponseDTO
         property: 'path',
         description: '服务器存储路径',
         type: 'string',
-        example: '/www/wwwroot/playground/madong-admin-saas/server/public/upload/42f86b9b36794fb9e380917c251f6d81.png'
+        example: '/www/wwwroot/playground/madong-admin/server/public/upload/42f86b9b36794fb9e380917c251f6d81.png'
     )]
     public string $path;
 

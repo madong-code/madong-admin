@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -9,12 +11,10 @@
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 namespace app\dao\member;
 
-
 use app\model\member\MemberTagPermission;
-use core\base\BaseDao;
+use core\foundation\base\BaseDao;
 
 class MemberTagPermissionDao extends BaseDao
 {

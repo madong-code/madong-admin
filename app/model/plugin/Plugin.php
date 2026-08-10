@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -13,7 +14,7 @@ declare(strict_types=1);
 
 namespace app\model\plugin;
 
-use core\base\BaseModel;
+use core\foundation\base\BaseModel;
 
 /**
  * 系统插件
@@ -24,7 +25,7 @@ use core\base\BaseModel;
 class Plugin extends BaseModel
 {
 
-    protected $table = 'plugin';
+    protected $table = 'sys_plugin';
 
     /**
      * 指示是否自动维护时间戳
@@ -60,4 +61,6 @@ class Plugin extends BaseModel
         'support_app',
     ];
 
-}
+    protected $casts = [
+        'id'        => 'string',
+    ];}

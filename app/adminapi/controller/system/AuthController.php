@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -15,25 +16,25 @@ namespace app\adminapi\controller\system;
 
 use app\adminapi\controller\Crud;
 use app\adminapi\CurrentUser;
-use app\adminapi\event\MenuFormattingEvent;
+use app\adminapi\event\system\MenuFormattingEvent;
 use app\adminapi\middleware\AccessTokenMiddleware;
 use app\adminapi\middleware\OperationMiddleware;
-use core\jwt\ex\JwtRefreshTokenExpiredException;
+use core\security\jwt\ex\JwtRefreshTokenExpiredException;
 use support\Container;
 use app\adminapi\middleware\PermissionMiddleware;
-use app\adminapi\validate\system\AuthValidate;
-use app\service\admin\system\AdminRoleService;
-use app\service\admin\system\AdminService;
-use app\service\admin\system\AuthService;
-use app\service\admin\system\MenuService;
-use app\service\admin\system\RoleMenuService;
-use app\service\admin\system\RoleScopeDeptService;
-use app\service\admin\system\RoleService;
+use app\adminapi\validate\system\admin\AuthValidate;
+use app\service\admin\system\admin\AdminRoleService;
+use app\service\admin\system\admin\AdminService;
+use app\service\admin\system\admin\AuthService;
+use app\service\admin\system\menu\MenuService;
+use app\service\admin\system\role\RoleMenuService;
+use app\service\admin\system\role\RoleScopeDeptService;
+use app\service\admin\system\role\RoleService;
 use madong\swagger\attribute\AllowAnonymous;
 use madong\swagger\attribute\Permission;
-use core\exception\handler\UnauthorizedHttpException;
-use core\jwt\JwtToken;
-use core\tool\Json;
+use core\foundation\exception\handler\UnauthorizedHttpException;
+use core\security\jwt\JwtToken;
+use core\foundation\tool\Json;
 use madong\helper\Dict;
 use madong\swagger\annotation\response\SimpleResponse;
 use OpenApi\Attributes as OA;
@@ -44,10 +45,13 @@ use Webman\Event\Event;
 #[Middleware(AccessTokenMiddleware::class, PermissionMiddleware::class, OperationMiddleware::class)]
 final class AuthController extends Crud
 {
-    public function __construct(AuthService $service, AuthValidate $validate)
+    private AdminService $adminService;
+
+    public function __construct(AuthService $service, AuthValidate $validate, AdminService $adminService)
     {
-        $this->service  = $service;
-        $this->validate = $validate;
+        $this->service      = $service;
+        $this->validate     = $validate;
+        $this->adminService = $adminService;
     }
 
     #[OA\Get(
@@ -64,10 +68,15 @@ final class AuthController extends Crud
         try {
             /** @var CurrentUser $currentUser */
             $currentUser = Container::make(CurrentUser::class);
-            $data        = $currentUser->admin(true);
+
+            $data = $currentUser->admin(true);
+
             if (empty($data)) {
                 throw new UnauthorizedHttpException('用户凭证失效请重新登录');
             }
+
+            $data['is_platform_super'] = (int)$currentUser->isPlatformSuper();
+
             return Json::success('ok', $data);
         } catch (\Throwable $e) {
             return Json::fail($e->getMessage(), null, 401);
@@ -86,7 +95,7 @@ final class AuthController extends Crud
     public function getPermissionsMenu(Request $request): \support\Response
     {
         try {
-            $format = input('format', 'default');
+            $format = input('format', 'vben');
             /** @var CurrentUser $currUser */
             $currUser   = Container::make(CurrentUser::class);
             $collection = $this->service->getMenusByUserRoles($currUser, true);
@@ -324,7 +333,7 @@ final class AuthController extends Crud
     /**
      * @throws \core\jwt\ex\JwtRefreshTokenExpiredException
      */
-    #[OA\Post(
+    #[OA\Get(
         path: '/system/auth/refresh-token',
         summary: '刷新Token',
         security: [['Bearer' => [], 'ApiKey' => []]],
@@ -345,7 +354,6 @@ final class AuthController extends Crud
                 'expires_at'    => $token->expiresAt->getTimestamp(),
             ]);
         } catch (\Throwable $e) {
-            var_dump($e->getMessage());
             throw new JwtRefreshTokenExpiredException('登录凭证失效');
         }
     }

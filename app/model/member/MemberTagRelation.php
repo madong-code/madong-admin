@@ -1,14 +1,24 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\model\member;
 
-use Illuminate\Database\Eloquent\Relations\Pivot;
+use core\foundation\base\BasePivot;
 
 /**
  * 会员标签关系模型
  */
-class MemberTagRelation extends Pivot
+class MemberTagRelation extends BasePivot
 {
     /**
      * 数据表名称
@@ -21,6 +31,11 @@ class MemberTagRelation extends Pivot
     protected $fillable = [
         'member_id',
         'tag_id',
+    ];
+
+    protected $casts = [
+        'member_id' => 'string',
+        'tag_id'    => 'string',
     ];
 
     /**

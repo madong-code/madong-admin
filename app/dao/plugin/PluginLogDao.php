@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -14,7 +15,7 @@ declare(strict_types=1);
 namespace app\dao\plugin;
 
 use app\model\plugin\PluginLog;
-use core\base\BaseDao;
+use core\foundation\base\BaseDao;
 
 /**
  * 插件日志数据访问层

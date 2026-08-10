@@ -1,14 +1,24 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\service\api\auth;
 
 use app\model\member\Member;
 use app\model\member\MemberThirdParty;
 use app\enum\common\EnabledStatus;
 use app\enum\member\ThirdPartyType;
-use core\base\BaseService;
-use core\jwt\JwtToken;
+use core\foundation\base\BaseService;
+use core\security\jwt\JwtToken;
 use support\Redis;
 
 /**

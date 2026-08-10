@@ -1,11 +1,20 @@
 <?php
-
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\api\validate\auth;
 
 use app\model\member\Member;
-use core\base\BaseValidate;
+use core\foundation\base\BaseValidate;
 use Illuminate\Validation\Rule;
 
 /**
@@ -46,7 +55,7 @@ class RegisterValidate extends BaseValidate
     /**
      * 验证提示信息
      */
-    protected array $message = [
+    protected array $messages = [
         'username.required'         => '用户名不能为空',
         'username.min'              => '用户名长度不能少于3个字符',
         'username.max'              => '用户名长度不能超过50个字符',
@@ -65,7 +74,7 @@ class RegisterValidate extends BaseValidate
     /**
      * 验证场景
      */
-    protected array $scene = [
+    protected array $scenes = [
         'register'       => ['username', 'password', 'email', 'mobile'],
         'quick_register' => ['username', 'password'],
     ];

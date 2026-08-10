@@ -1,18 +1,28 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\service\api\auth;
 
+use app\api\CurrentMember;
 use app\dao\member\MemberDao;
 use app\enum\common\EnabledStatus;
 use app\model\member\Member;
 use app\service\admin\system\ConfigService;
-use core\base\BaseService;
-use core\email\MailService;
-use core\jwt\JwtToken;
+use core\foundation\base\BaseService;
+use core\communication\email\MailService;
+use core\security\jwt\JwtToken;
 use support\Container;
 use support\Redis;
-
 
 /**
  * 认证服务
@@ -78,12 +88,16 @@ class AuthService extends BaseService
             'refresh_token' => $tokenObj->refreshToken,
             'expires_in' => $tokenObj->expiresIn
         ];
-        return array_merge($token, ['user_info' => $userInfo]);
+
+        // 获取会员权限码
+        $permissions = $this->getMemberPermissions($member);
+
+        return array_merge($token, [
+            'user_info'   => $userInfo,
+            'permissions' => $permissions,
+        ]);
     }
 
-    /**
-     * 手机验证码登录
-     */
     public function loginWithMobile(array $data): array
     {
         if (empty($data['mobile']) || empty($data['code'])) {
@@ -130,9 +144,12 @@ class AuthService extends BaseService
             'expires_in' => $tokenObj->expiresIn
         ];
 
+        // 获取会员权限码
+        $permissions = $this->getMemberPermissions($member);
+
         return [
-            'token'     => $token,
-            'user_info' => [
+            'token'       => $token,
+            'user_info'   => [
                 'id'       => $member->id,
                 'username' => $member->username,
                 'nickname' => $member->nickname,
@@ -142,6 +159,7 @@ class AuthService extends BaseService
                 'points'   => $member->points,
                 'balance'  => $member->balance,
             ],
+            'permissions' => $permissions,
         ];
     }
 
@@ -158,11 +176,10 @@ class AuthService extends BaseService
             if (str_starts_with($token, 'Bearer ')) {
                 $token = substr($token, 7);
             }
-            // 使用新的 JwtToken 实现退出登录
-            try {
-                (new JwtToken())->logout($token);
-            } catch (\Exception $e) {
-                // 忽略异常，确保退出成功
+            // 退出登录，将 token 加入黑名单防止被复用
+            $loggedOut = (new JwtToken())->logout($token);
+            if (!$loggedOut) {
+                // logout 内部已记录错误日志，此处不阻塞退出流程
             }
         }
 
@@ -208,8 +225,11 @@ class AuthService extends BaseService
             'refresh_token' => $tokenObj->refreshToken,
             'expires_in' => $tokenObj->expiresIn
         ];
+        // 获取会员权限码（新注册用户权限通常为空）
+        $permissions = $this->getMemberPermissions($member);
+
         return array_merge($token, [
-            'user_info' => [
+            'user_info'   => [
                 'id'       => $member->id,
                 'username' => $member->username,
                 'nickname' => $member->nickname,
@@ -219,6 +239,7 @@ class AuthService extends BaseService
                 'points'   => $member->points,
                 'balance'  => $member->balance,
             ],
+            'permissions' => $permissions,
         ]);
     }
 
@@ -700,6 +721,31 @@ HTML;
             return $mid ?? 0;
         } catch (\Exception $e) {
             throw new \Exception('登录已过期', 401);
+        }
+    }
+
+    /**
+     * 获取会员权限码列表（通过标签获取菜单权限码）
+     *
+     * @param Member $member
+     * @return array 权限码数组
+     */
+    private function getMemberPermissions(Member $member): array
+    {
+        try {
+            $permissions = [];
+            $tags = $member->tags()->with('permissions')->where('enabled', 1)->get();
+            foreach ($tags as $tag) {
+                foreach ($tag->permissions as $permission) {
+                    if (!empty($permission->code)) {
+                        $permissions[] = $permission->code;
+                    }
+                }
+            }
+            return array_unique($permissions);
+        } catch (\Exception $e) {
+            // 获取权限失败不影响登录
+            return [];
         }
     }
 }

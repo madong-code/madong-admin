@@ -1,15 +1,25 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\service\admin\member;
 
 use app\dao\member\MemberDao;
 use app\dao\member\MemberPointsDao;
 use app\enum\member\PointType;
 use app\enum\member\PointSource;
-use app\adminapi\event\PointsChangedEvent;
-use core\base\BaseService;
-use core\exception\handler\AdminException;
+use app\adminapi\event\member\PointsChangedEvent;
+use core\foundation\base\BaseService;
+use core\foundation\exception\handler\AdminException;
 use support\Container;
 
 /**
@@ -29,54 +39,52 @@ class MemberPointsService extends BaseService
     /**
      * 积分操作
      *
-     * @throws \core\exception\handler\AdminException
+     * 仅计算积分并派发事件，由事件监听器统一处理所有 DB 写入（更新会员积分、记录积分流水、更新等级）。
+     * 参考 app\service\api\member\MemberPointsService 的模式。
+     *
+     * @throws \core\foundation\exception\handler\AdminException
      * @throws \Throwable
      */
     public function operate(array $data): void
     {
         try {
-            $this->transaction(function () use ($data) {
-                $memberDao = Container::make(MemberDao::class);
-                $member    = $memberDao->get($data['member_id']);
-                $oldPoints = $member->points;
-                if (!$member) {
-                    throw new AdminException('会员不存在');
-                }
-                $points = (int)$data['points'];
-                $type   = (int)$data['type'];
-                $remark = $data['remark'] ?? '';
+            // 1. 查询会员
+            $memberDao = Container::make(MemberDao::class);
+            $member = $memberDao->get($data['member_id']);
+            if (!$member) {
+                throw new AdminException('会员不存在');
+            }
 
-                // 更新会员积分
-                if ($type == PointType::INCREASE->value) {
-                    $member->points += $points;
+            $oldPoints = $member->points;
+            $points = (int)$data['points'];
+            $type   = (int)$data['type'];
+            $remark = $data['remark'] ?? '';
+
+            // 2. 计算新积分
+            if ($type == PointType::INCREASE->value) {
+                $newPoints = $oldPoints + $points;
+            } elseif ($type == PointType::DECREASE->value) {
+                if ($oldPoints < $points) {
+                    throw new AdminException('积分不足');
                 }
-                if ($type == PointType::DECREASE->value) {
-                    if ($member->points < $points) {
-                        throw new AdminException('积分不足');
-                    }
-                    $member->points -= $points;
-                }
-                if($type == PointType::ADJUST->value){
-                     $member->points = $points;
-                }
-                $member->save();
-                // 记录积分变动
-                $pointsData   = [
-                    'member_id'   => $member->id,
-                    'points'      => $points,
-                    'type'        => $type,
-                    'balance'     => $member->points,
-                    'remark'      => $remark,
-                ];
-                $this->dao->save($pointsData);
-                
+                $newPoints = $oldPoints - $points;
+            } elseif ($type == PointType::ADJUST->value) {
+                $newPoints = $points;
+            } else {
+                throw new AdminException('无效的积分类型');
+            }
+
+            // 3. 事务中只派发事件，由 Listener 统一处理 DB 写入
+            $this->transaction(function () use ($member, $oldPoints, $newPoints, $points, $type, $remark) {
+                $pointType = PointType::tryFrom($type) ?? PointType::INCREASE;
+
                 $event = new PointsChangedEvent(
                     $member->id,
                     $points,
                     PointSource::ADMIN,
-                    PointType::INCREASE,
+                    $pointType,
                     $oldPoints,
-                    $member->points,
+                    $newPoints,
                     $remark
                 );
                 $event->dispatch();

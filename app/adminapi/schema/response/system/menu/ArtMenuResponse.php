@@ -14,7 +14,6 @@ declare(strict_types=1);
 
 namespace app\adminapi\schema\response\system\menu;
 
-
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(

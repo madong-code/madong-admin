@@ -1,6 +1,16 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\model\web;
 
 use app\enum\common\EnabledStatus;
@@ -8,7 +18,7 @@ use app\enum\common\YesNoStatus;
 use app\enum\system\MenuType;
 use app\enum\web\MenuCategory;
 use app\enum\web\MenuTarget;
-use core\base\BaseModel;
+use core\foundation\base\BaseModel;
 
 /**
  * 菜单模型
@@ -34,6 +44,8 @@ class Menu extends BaseModel
         'category',
         'source',
         'code',
+        'is_public',
+        'is_no_auth',
         'name',
         'url',
         'pid',
@@ -63,10 +75,9 @@ class Menu extends BaseModel
     ];
 
     protected $casts = [
-        'id'     => 'string',
-        'pid'    => 'string',
-        'extra'  => 'json',
-        'category'=>'int'
+        'extra'     => 'json',
+        'id'        => 'string',
+        'pid'       => 'string',
     ];
 
     /**
@@ -101,7 +112,7 @@ class Menu extends BaseModel
      */
     public function getEnabledTextAttribute(): string
     {
-        $status = EnabledStatus::tryFrom((int)$this->status);
+        $status = EnabledStatus::tryFrom((int)$this->enabled);
         return $status?->label() ?? '未知';
     }
 

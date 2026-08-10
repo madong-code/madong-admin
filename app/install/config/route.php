@@ -1,5 +1,16 @@
 <?php
+declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 use Webman\Route;
 use WebmanTech\Swagger\Swagger;
 use OpenApi\Annotations as OA;
@@ -28,7 +39,6 @@ use OpenApi\Annotations as OA;
 //        ],
 //    ]);
 //});
-
 
 // 安装模块API路由
 //Route::any('/install/api', [app\install\controller\Index::class, 'index']);

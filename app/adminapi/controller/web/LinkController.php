@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -21,7 +22,7 @@ use app\adminapi\validate\web\LinkValidate;
 use app\schema\request\IdRequest;
 use app\service\admin\web\LinkService;
 use madong\swagger\attribute\Permission;
-use core\tool\Json;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use OpenApi\Attributes as OA;
 use support\annotation\Middleware;

@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -15,7 +16,7 @@ declare(strict_types=1);
 namespace app\command\install;
 
 use app\command\BaseCommand;
-use app\service\core\install\InstallService;
+use core\business\install\InstallService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;

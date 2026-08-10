@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -15,11 +16,10 @@ namespace app\api\controller\system;
 
 use app\api\controller\Base;
 use app\api\middleware\ApiAccessTokenMiddleware;
-use app\api\schema\request\system\ConfigGroupQueryRequest;
 use app\api\schema\request\system\ConfigQueryRequest;
 use app\api\schema\request\system\ConfigValueRequest;
 use app\service\api\system\ConfigService;
-use core\tool\Json;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
 use OpenApi\Attributes as OA;
@@ -33,45 +33,6 @@ final class ConfigController extends Base
     public function __construct(ConfigService $service)
     {
         $this->service = $service;
-    }
-
-    /**
-     * 按分组获取配置
-     *
-     * @param Request $request
-     * @param string  $group_code
-     *
-     * @return \support\Response
-     * @throws \Exception
-     */
-    #[OA\Get(
-        path: "/system/config/group/{group_code}",
-        summary: "按分组获取配置",
-        tags: ["系统配置"],
-        x: [
-            SchemaConstants::X_SCHEMA_REQUEST => ConfigGroupQueryRequest::class,
-        ]
-    )]
-    #[SimpleResponse(schema: [], example: '{"site_open": "1","site_url": "http://127.0.0.1:8001","site_name": "madong-admin","site_logo": "https://madong.tech/assets/images/logo.svg","site_network_security": "2024042441号-2","site_description": "快速开发框架","site_record_no": "2024042442","site_icp_url": "https://beian.miit.gov.cn/","site_network_security_url": ""}')]
-    #[AllowAnonymous(requireToken: false, requirePermission: false, description: '公共接口')]
-    public function getByGroup(Request $request, string $group_code): \support\Response
-    {
-        try {
-            // 参数验证
-            if (empty($group_code)) {
-                return Json::fail('分组编码不能为空');
-            }
-
-            $options = [
-                'enabled_only'  => $request->input('enabled_only', true),
-                'with_metadata' => $request->input('with_metadata', false),
-            ];
-            $result  = $this->service->getByGroup($group_code, [], $options);
-            return Json::success('操作成功', $result);
-        } catch (\Exception $e) {
-
-            return Json::fail($e->getMessage());
-        }
     }
 
     #[OA\Get(
@@ -94,15 +55,16 @@ final class ConfigController extends Base
     public function getByCode(Request $request, string $code): \support\Response
     {
         try {
-            // 参数验证
             if (empty($code)) {
                 return Json::fail('配置编码不能为空');
             }
 
+            // 先查指定分组（如果有），再自动回退到 default 分组
             $groupCode = $request->input('group_code', '');
             $options   = [];
             if (!empty($groupCode)) {
                 $options['group_code'] = $groupCode;
+                $options['fallback_groups'] = ['default'];
             }
             $result = $this->service->config($code, [], $options);
             return Json::success('操作成功', $result);
@@ -133,19 +95,22 @@ final class ConfigController extends Base
     public function getValue(Request $request, string $code): \support\Response
     {
         try {
-            // 参数验证
             if (empty($code)) {
                 return Json::fail('配置项编码不能为空');
             }
 
-            $groupCode = $request->input('group_code');
-            $key       = $request->input('key');
-
-            if (empty($groupCode) || empty($key)) {
-                return Json::fail('分组编码和配置键不能为空');
+            $key = $request->input('key');
+            if (empty($key)) {
+                return Json::fail('配置键不能为空');
             }
 
-            $result = $this->service->getValue($code, $key, null, ['group_code' => $groupCode]);
+            // 自动在指定分组（如有）和 default 分组中查找
+            $groupCode = $request->input('group_code', '');
+            $options   = ['search_groups' => ['default']];
+            if (!empty($groupCode)) {
+                array_unshift($options['search_groups'], $groupCode);
+            }
+            $result = $this->service->getValue($code, $key, null, $options);
             return Json::success('操作成功', $result);
         } catch (\Exception $e) {
             return Json::fail($e->getMessage());

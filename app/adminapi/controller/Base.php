@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -13,7 +14,7 @@ declare(strict_types=1);
 
 namespace app\adminapi\controller;
 
-use core\base\BaseController;
+use core\foundation\base\BaseController;
 
 /**
  * 基类控制器继承的类
@@ -23,7 +24,6 @@ use core\base\BaseController;
  */
 class Base extends BaseController
 {
-
 
     /**
      * 初始化

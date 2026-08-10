@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -13,7 +14,7 @@ declare(strict_types=1);
 
 namespace app\enum\common;
 
-use core\interface\IEnum;
+use core\foundation\interface\IEnum;
 
 /**
  * 枚举分类映射枚举

@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -16,13 +17,14 @@ namespace app\service\admin\plugin;
 use app\dao\plugin\PluginDao;
 use app\model\plugin\Plugin;
 use app\process\Monitor;
-use core\base\BaseService;
-use core\exception\handler\AdminException;
-use core\uuid\Snowflake;
+use core\foundation\base\BaseService;
+use core\foundation\exception\handler\AdminException;
+use core\io\uuid\Snowflake;
 use support\Container;
+use ZipArchive;
 
 /**
- * Plugin服务层
+ * Plugin服务层 - 插件开发管理
  *
  * @author Mr.April
  * @since  1.0
@@ -35,418 +37,55 @@ class PluginDevelopService extends BaseService
 
     public function __construct(PluginDao $dao)
     {
-        $this->dao       = $dao;
-        $basePath      = base_path();
-        $projectPath  = dirname($basePath);
-        $frontendPath = $projectPath . '/frontend';
+        $this->dao        = $dao;
+        $basePath         = base_path();
+        $projectPath      = dirname($basePath);
 
-        $this->pluginDir = $basePath . '/plugin';
-        $this->adminDir  = $frontendPath . '/admin/src/apps';
-        $this->webDir    = $frontendPath . '/web/app/apps';
-    }  
-
-    /**
-     * 获取插件列表（扫描插件目录并同步到数据库）
-     *
-     * @param array $where 查询条件（标准filters格式）
-     * @param int   $page  页码
-     * @param int   $limit 每页数量
-     *
-     * @return array
-     * @throws \Exception
-     */
-    public function getList(array $where = [], int $page = 1, int $limit = 15): array
-    {
-        // 先扫描插件目录，将新插件同步到数据库
-        $this->syncPlugins();
-        return $this->dao->getList($where, $page, $limit);
+        $this->pluginDir  = $basePath . '/plugin';
+        $this->adminDir   = $projectPath . '/template/admin/src/plugin';
+        $this->webDir     = $projectPath . '/template/web/app/plugin';
     }
 
     /**
-     * 扫描插件目录并同步到数据库
-     *
-     * @return void
-     * @throws \Exception
+     * 删除插件（同时删除数据库记录和插件目录，防止 syncPlugins 重新创建）
+     * 已安装的插件不允许删除，必须先卸载（防止前端分散资源残留）
      */
-    private function syncPlugins(): void
-    {
-        // 获取插件根目录下所有子目录
-        if (!is_dir($this->pluginDir)) {
-            return;
-        }
-
-        $dirs               = scandir($this->pluginDir);
-        $pluginsToInsert    = [];
-        $existingPluginKeys = [];
-
-        foreach ($dirs as $dir) {
-            // 跳过.和..目录
-            if ($dir === '.' || $dir === '..') {
-                continue;
-            }
-
-            // 优先读取 info.php 获取插件基本信息
-            $infoPath = $this->pluginDir . '/' . $dir . '/config/info.php';
-            if (!file_exists($infoPath)) {
-                continue;
-            }
-
-            // 加载插件 info 配置
-            $infoConfig = include $infoPath;
-            if (!is_array($infoConfig)) {
-                continue;
-            }
-
-            // 检查插件归属类型：madong(官方)、third(第三方)、custom(自定义)
-            $pluginType = $infoConfig['type'] ?? 'madong';
-
-            // 检查是否为madong类型的插件
-            if (!str_starts_with($pluginType, 'madong:') && $pluginType !== 'madong') {
-                continue;
-            }
-
-            $pluginKey            = $infoConfig['name'] ?? $dir;
-            $existingPluginKeys[] = $pluginKey;
-
-            // 检查 installed.php 判断是否已安装
-            $installedPath = $this->pluginDir . '/' . $dir . '/config/installed.php';
-            $isInstalled   = file_exists($installedPath);
-            $installedAt  = 0;
-            $status       = 0; // 默认未安装
-
-            if ($isInstalled) {
-                $installedConfig = include $installedPath;
-                if (is_array($installedConfig) && !empty($installedConfig['installed_at'])) {
-                    $installedAt = strtotime($installedConfig['installed_at']);
-                } else {
-                    $installedAt = time();
-                }
-                $status = 1; // 已安装
-            }
-
-            // 检查插件是否已存在于数据库
-            $existingPlugin = $this->dao->findByKey($pluginKey);
-            if ($existingPlugin) {
-                // 如果数据库存在但安装状态不同，同步更新
-                if ($existingPlugin->installed_at != $installedAt || $existingPlugin->status != $status) {
-                    $existingPlugin->installed_at = $installedAt;
-                    $existingPlugin->status      = $status;
-                    $existingPlugin->save();
-                }
-                continue;
-            }
-
-            // 读取icon和cover图片（base64或路径）
-            $icon  = $this->getPluginImageBase64($dir, 'icon');
-            $cover = $this->getPluginImageBase64($dir, 'cover');
-
-            // 使用 info.php 的字段
-            $pluginsToInsert[] = [
-                'id'           => Snowflake::generate(),
-                'title'        => $infoConfig['description'] ?? $pluginKey,
-                'key'          => $pluginKey,
-                'desc'         => $infoConfig['description'] ?? '',
-                'author'       => $infoConfig['author'] ?? '',
-                'version'      => $infoConfig['version'] ?? '1.0.0',
-                'type'         => $pluginType,
-                'icon'         => $icon,
-                'cover'        => $cover,
-                'status'       => $status,
-                'support_app'  => 'admin',
-                'created_at'   => time(),
-                'updated_at'   => time(),
-                'installed_at' => $installedAt,
-            ];
-        }
-        // 批量插入新插件
-        if (!empty($pluginsToInsert)) {
-            $this->dao->batchInsert($pluginsToInsert);
-        }
-        // 移除数据库中已不存在的插件
-        $this->removeNonExistingPlugins($existingPluginKeys);
-    }
-
-    /**
-     * 移除数据库中已不存在的插件
-     *
-     * @param array $existingPluginKeys 现有的插件key列表
-     *
-     * @return void
-     * @throws \Exception
-     */
-    private function removeNonExistingPlugins(array $existingPluginKeys): void
-    {
-        $allDbPluginKeys = $this->dao->getAllKeys();
-        $keysToDelete    = array_diff($allDbPluginKeys, $existingPluginKeys);
-
-        if (!empty($keysToDelete)) {
-            // 批量删除不存在的插件
-            foreach ($keysToDelete as $key) {
-                $plugin = $this->dao->findByKey($key);
-                if ($plugin) {
-                    $plugin->delete();
-                }
-            }
-        }
-    }
-
-    /**
-     * 获取插件图片的base64编码
-     *
-     * @param string $pluginName 插件名称
-     * @param string $imageName  图片名称（icon或cover）
-     *
-     * @return string|null
-     */
-    private function getPluginImageBase64(string $pluginName, string $imageName): ?string
-    {
-        $imagePath = $this->pluginDir . '/' . $pluginName . '/public/' . $imageName . '.png';
-        if (!file_exists($imagePath)) {
-            // 尝试查找resource目录下的图片
-            $resourcePath = $this->pluginDir . '/' . $pluginName . '/resource/public/' . $imageName . '.png';
-            if (!file_exists($resourcePath)) {
-                return null;
-            }
-            $imagePath = $resourcePath;
-        }
-        $imageData = file_get_contents($imagePath);
-        if ($imageData === false) {
-            return null;
-        }
-        return 'data:image/png;base64,' . base64_encode($imageData);
-    }
-
-    /**
-     * 获取插件详情
-     *
-     * @param string|int $id 插件ID
-     *
-     * @return Plugin|null
-     * @throws \Exception
-     */
-    public function read(string|int $id): ?Plugin
+    public function destroyPlugin(int|string $id): void
     {
         $plugin = $this->dao->get($id);
         if (!$plugin) {
-            return null;
+            throw new AdminException('插件不存在');
         }
-        $pluginConfigPath = $this->pluginDir . '/' . $plugin->key . '/config/app.php';
-        if (file_exists($pluginConfigPath)) {
-            $config = include $pluginConfigPath;
-            if (is_array($config)) {
-                // 更新插件信息
-                $plugin->title   = $config['title'] ?? $plugin->title;
-                $plugin->desc    = $config['description'] ?? $plugin->desc;
-                $plugin->author  = $config['author'] ?? $plugin->author;
-                $plugin->version = $config['version'] ?? $plugin->version;
-                $plugin->type    = $config['type'] ?? $plugin->type;
-                $plugin->icon    = $this->getPluginImageBase64($plugin->key, 'icon');
-                $plugin->cover   = $this->getPluginImageBase64($plugin->key, 'cover');
-            }
+
+        // 检查插件是否已安装 — 已安装的必须先卸载才能删除
+        $installedConfigPath = $this->pluginDir . DIRECTORY_SEPARATOR . $plugin->key . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'installed.php';
+        if (is_file($installedConfigPath)) {
+            throw new AdminException('插件已安装，请先卸载后再删除');
         }
-        return $plugin;
+
+        // 先删除插件目录
+        $pluginDir = $this->pluginDir . DIRECTORY_SEPARATOR . $plugin->key;
+        if (is_dir($pluginDir)) {
+            $this->removeDir($pluginDir);
+        }
+
+        // 再删除数据库记录
+        $plugin->delete();
     }
 
     /**
-     * 创建插件
-     *
-     * @param array $data
-     *
-     * @return void
-     * @throws \Throwable
-     * @throws \core\exception\handler\AdminException
+     * 递归删除目录
      */
-    public function store(array $data): void
+    private function removeDir(string $dir): void
     {
-        $this->transaction(function () use ($data) {
-            try {
-                if (empty($data['icon'])) {
-                    $data['icon'] = $this->generateDefaultIcon($data['title'] ?? 'Plugin');
-                }
-                if (empty($data['cover'])) {
-                    $data['cover'] = $this->generateDefaultCover($data['title'] ?? 'Plugin');
-                }
-                $model = $this->dao->save($data);
-                if (empty($model)) {
-                    throw new AdminException('插件创建失败');
-                }
-
-                $monitor_support_pause = method_exists(Monitor::class, 'pause');
-                if ($monitor_support_pause) {
-                    Monitor::pause();
-                }
-                //生成插件模板
-                /**@var \app\service\core\plugin\PluginDevelopService $service */
-                $service           = Container::make(\app\service\core\plugin\PluginDevelopService::class);
-                $pluginName        = $model->key;
-                $pluginTitle       = $model->title;
-                $pluginDescription = $model->desc ?? '';
-                $frontendType      = $data['frontend_type'] ?? 'admin';
-                $result            = $service->generatePluginTemplate($pluginName, $pluginTitle, $pluginDescription, $frontendType);
-                if ($result['code'] !== 200) {
-                    throw new AdminException($result['message']);
-                }
-
-                // 生成插件 info.php 配置文件
-                $this->createPluginInfoConfig($pluginName, $data);
-
-                //添加图片到对应插件位置
-                $publicPath = $this->pluginDir . '/' . $pluginName . '/public';
-                // 确保public目录存在
-                if (!is_dir($publicPath)) {
-                    mkdir($publicPath, 0755, true);
-                }
-                $iconPath  = $publicPath . '/icon.png';
-                $coverPath = $publicPath . '/cover.png';
-                $this->saveBase64Image($data['icon'], $iconPath);
-                $this->saveBase64Image($data['cover'], $coverPath);
-                if ($monitor_support_pause) {
-                    Monitor::resume();
-                }
-            } catch (\Exception $e) {
-                throw new AdminException($e->getMessage());
-            }
-        });
-    }
-
-    /**
-     * 打包插件
-     *
-     * @param string  $pluginKey      插件标识
-     * @param bool    $updateTemplate 是否更新前端模板到resource/template目录（默认true）
-     *
-     * @return array
-     * @throws \core\exception\handler\AdminException
-     */
-    public function buildPlugin(string $pluginKey, bool $updateTemplate = true): array
-    {
-        try {
-            // 查询插件信息
-            $plugin = $this->dao->findByKey($pluginKey);
-            if (!$plugin) {
-                throw new AdminException('插件不存在');
-            }
-
-            // 定义路径
-            $backendPath  = $this->pluginDir . '/' . $pluginKey;
-            $adminPath    = $this->adminDir . '/' . $pluginKey;
-            $webPath      = $this->webDir . '/' . $pluginKey;
-            $resourcePath = $backendPath . '/resource/template';
-
-            // 验证后端插件目录是否存在
-            if (!is_dir($backendPath)) {
-                throw new AdminException("插件后端目录不存在: {$backendPath}");
-            }
-
-            // 是否更新前端模板到 resource/template 目录
-            if ($updateTemplate) {
-                // 清理并创建template目录
-                if (is_dir($resourcePath)) {
-                    $this->removeDirectory($resourcePath);
-                }
-
-                $resourceCount = 0;
-
-                // 复制后台前端到template目录（如果存在）
-                if (is_dir($adminPath)) {
-                    $this->copyDirectory($adminPath, $resourcePath . '/admin');
-                    $resourceCount++;
-                }
-
-                // 复制前台前端到resource目录（如果存在）
-                if (is_dir($webPath)) {
-                    $this->copyDirectory($webPath, $resourcePath . '/web');
-                    $resourceCount++;
-                }
-
-                if ($resourceCount === 0) {
-                    // 没有前端资源，清空resource目录
-                    if (is_dir($resourcePath)) {
-                        rmdir($resourcePath);
-                    }
-                }
-            } else {
-                // 不更新时检查是否已有模板
-                $resourceCount = (is_dir($resourcePath . '/admin') || is_dir($resourcePath . '/web')) ? 1 : 0;
-            }
-
-            // 调用核心服务的 build 方法打包插件
-            $pluginsDir = base_path() . '/runtime/plugins';
-            /** @var \app\service\core\plugin\PluginDevelopService $coreService */
-            $coreService = Container::make(\app\service\core\plugin\PluginDevelopService::class);
-            $result = $coreService->build($pluginKey, $pluginsDir);
-
-            if ($result['code'] !== 200) {
-                throw new AdminException($result['message']);
-            }
-
-            return [
-                'plugin_key'   => $pluginKey,
-                'zip_path'     => $result['data']['zip_file_path'],
-                'has_frontend' => $resourceCount > 0,
-            ];
-        } catch (\Exception $e) {
-            throw new AdminException('插件打包失败: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * 复制目录
-     *
-     * @param string $source 源目录
-     * @param string $target 目标目录
-     *
-     * @return void
-     */
-    private function copyDirectory(string $source, string $target): void
-    {
-        if (!is_dir($source)) {
-            return;
-        }
-
-        if (!is_dir($target)) {
-            mkdir($target, 0755, true);
-        }
-
-        $files = scandir($source);
-        foreach ($files as $file) {
-            if ($file === '.' || $file === '..') {
-                continue;
-            }
-
-            $sourceFile = $source . '/' . $file;
-            $targetFile = $target . '/' . $file;
-
-            if (is_dir($sourceFile)) {
-                $this->copyDirectory($sourceFile, $targetFile);
-            } else {
-                copy($sourceFile, $targetFile);
-            }
-        }
-    }
-
-    /**
-     * 删除目录及其内容
-     *
-     * @param string $dir 目录路径
-     *
-     * @return void
-     */
-    private function removeDirectory(string $dir): void
-    {
-        if (!is_dir($dir)) {
-            return;
-        }
-
         $files = scandir($dir);
         foreach ($files as $file) {
             if ($file === '.' || $file === '..') {
                 continue;
             }
-
-            $path = $dir . '/' . $file;
+            $path = $dir . DIRECTORY_SEPARATOR . $file;
             if (is_dir($path)) {
-                $this->removeDirectory($path);
+                $this->removeDir($path);
             } else {
                 unlink($path);
             }
@@ -455,69 +94,165 @@ class PluginDevelopService extends BaseService
     }
 
     /**
-     * 更新插件信息
-     *
-     * @param int|string $id   插件ID
-     * @param array      $data 更新数据
-     *
-     * @return void
-     * @throws \Throwable
-     * @throws \core\exception\handler\AdminException
+     * 获取插件列表（扫描插件目录并同步到数据库）
      */
-    public function update(int|string $id, array $data): void
+    public function getList(array $where = [], int $page = 1, int $limit = 15): array
     {
-        $this->transaction(function () use ($id, $data) {
-            $model = $this->dao->get($id);
-            if (!$model) {
-                throw new AdminException('插件不存在');
-            }
+        $this->syncPlugins();
 
-            $pluginKey = $model->getAttribute('key');
-
-            // 更新数据库 - 排除key字段,不允许修改插件标识
-            $updateData = $data;
-            unset($updateData['key']);
-            $model->fill($updateData);
-            $model->save();
-
-            // 更新插件配置文件 app.php
-            $this->updatePluginConfig($pluginKey, $data);
-
-            // 添加图片到对应插件位置(仅当提供了新的base64图片时)
-            if (isset($data['icon']) || isset($data['cover'])) {
-                $pluginDirName = $this->findPluginDirectory($pluginKey);
-                if ($pluginDirName) {
-                    $publicPath = $this->pluginDir . '/' . $pluginDirName . '/public';
-                    // 确保public目录存在
-                    if (!is_dir($publicPath)) {
-                        mkdir($publicPath, 0755, true);
-                    }
-
-                    if (!empty($data['icon'])) {
-                        $iconPath = $publicPath . '/icon.png';
-                        $this->saveBase64Image($data['icon'], $iconPath);
-                    }
-
-                    if (!empty($data['cover'])) {
-                        $coverPath = $publicPath . '/cover.png';
-                        $this->saveBase64Image($data['cover'], $coverPath);
-                    }
-                }
-            }
-        });
+        return $this->dao->getList($where, $page, $limit);
     }
 
     /**
-     * 根据插件key查找实际的目录名
-     *
-     * @param string $pluginKey 插件key
-     *
-     * @return string|null
+     * 获取插件详情
      */
-    private function findPluginDirectory(string $pluginKey): ?string
+    public function show(int|string $id): ?Plugin
+    {
+        return $this->dao->get($id);
+    }
+
+    /**
+     * 创建插件
+     */
+    public function store(array $data): mixed
+    {
+        $pluginKey = $data['key'] ?? '';
+        $pluginDir = $this->pluginDir . DIRECTORY_SEPARATOR . $pluginKey;
+
+        if (is_dir($pluginDir)) {
+            throw new AdminException('插件目录已存在');
+        }
+
+        // 暂停文件监控，防止创建目录时触发重载
+        $monitorSupportPause = method_exists(Monitor::class, 'pause');
+        if ($monitorSupportPause) {
+            Monitor::pause();
+        }
+
+        try {
+            // 创建插件目录结构
+            $this->createPluginStructure($pluginKey, $data);
+        } finally {
+            if ($monitorSupportPause) {
+                Monitor::resume();
+            }
+        }
+
+        $insertData = [
+            'id'         => Snowflake::generate(),
+            'key'        => $pluginKey,
+            'title'      => $data['title'] ?? '',
+            'desc'       => $data['desc'] ?? '',
+            'author'     => $data['author'] ?? '',
+            'version'    => $data['version'] ?? '1.0.0',
+            'type'       => $data['type'] ?? 'custom',
+            'status'     => 1,
+            'icon'       => $data['icon'] ?? '',
+            'cover'      => $data['cover'] ?? '',
+            'support_app' => $data['support_app'] ?? '',
+        ];
+
+        return $this->dao->save($insertData);
+    }
+
+    /**
+     * 更新插件
+     */
+    public function update(int|string $id, array $data): mixed
+    {
+        $plugin = $this->dao->get($id);
+        if (!$plugin) {
+            throw new AdminException('插件不存在');
+        }
+
+        // 写入info.php
+        $pluginDir = $this->pluginDir . DIRECTORY_SEPARATOR . $plugin->key;
+        if (is_dir($pluginDir)) {
+            $this->writePluginInfo($pluginDir, $plugin->key, $data);
+        }
+
+        return $this->dao->update($id, $data);
+    }
+
+    /**
+     * 打包插件
+     */
+    public function buildPlugin(int|string $id): array
+    {
+        $plugin = $this->dao->get($id);
+        if (!$plugin) {
+            throw new AdminException('插件不存在');
+        }
+
+        $pluginKey = $plugin->key;
+        $pluginSourceDir = $this->pluginDir . DIRECTORY_SEPARATOR . $pluginKey;
+
+        if (!is_dir($pluginSourceDir)) {
+            throw new AdminException('插件目录不存在');
+        }
+
+        // 1. 执行 PluginBuildService 装配（复制前端文件等）
+        try {
+            $buildService = Container::make(\app\service\core\plugin\PluginBuildService::class);
+            $buildService->build($pluginKey);
+        } catch (\Throwable) {
+            // 装配阶段失败不影响打包
+        }
+
+        // 2. 创建ZIP文件
+        $zipFilePath = runtime_path() . DIRECTORY_SEPARATOR . $pluginKey . '.zip';
+        $zip = new ZipArchive();
+        if ($zip->open($zipFilePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new \RuntimeException("无法创建ZIP文件: {$zipFilePath}");
+        }
+
+        $this->addDirToZip($zip, $pluginSourceDir, '');
+        $zip->close();
+
+        // 3. 检查是否有前端资源
+        $hasFrontend = false;
+        $projectPath = dirname(base_path());
+        $adminAddonDir = $projectPath . '/template/admin/src/plugin/' . $pluginKey;
+        $webAddonDir = $projectPath . '/template/web/app/plugin/' . $pluginKey;
+        if (is_dir($adminAddonDir) || is_dir($webAddonDir)) {
+            $hasFrontend = true;
+        }
+
+        return [
+            'plugin_key' => $pluginKey,
+            'zip_path' => $zipFilePath,
+            'has_frontend' => $hasFrontend,
+        ];
+    }
+
+    /**
+     * 递归添加目录到ZIP
+     */
+    private function addDirToZip(ZipArchive $zip, string $dir, string $relativePath): void
+    {
+        $files = scandir($dir);
+        foreach ($files as $file) {
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+            $fullPath = $dir . DIRECTORY_SEPARATOR . $file;
+            $zipPath = $relativePath ? $relativePath . '/' . $file : $file;
+            if (is_dir($fullPath)) {
+                $zip->addEmptyDir($zipPath);
+                $this->addDirToZip($zip, $fullPath, $zipPath);
+            } else {
+                $zip->addFile($fullPath, $zipPath);
+            }
+        }
+    }
+
+    /**
+     * 扫描插件目录，同步到数据库
+     */
+    public function syncPlugins(): void
     {
         if (!is_dir($this->pluginDir)) {
-            return null;
+            return;
         }
 
         $dirs = scandir($this->pluginDir);
@@ -526,392 +261,567 @@ class PluginDevelopService extends BaseService
                 continue;
             }
 
-            // 优先使用 info.php 查找插件key
-            $infoPath = $this->pluginDir . '/' . $dir . '/config/info.php';
-            if (file_exists($infoPath)) {
-                $infoConfig = include $infoPath;
-                if (is_array($infoConfig) && isset($infoConfig['name']) && $infoConfig['name'] === $pluginKey) {
-                    return $dir;
-                }
-            }
-
-            // 如果 info.php 不存在或找不到，尝试从 app.php 查找（旧版本兼容）
-            $configPath = $this->pluginDir . '/' . $dir . '/config/app.php';
-            if (!file_exists($configPath)) {
+            $pluginPath = $this->pluginDir . DIRECTORY_SEPARATOR . $dir;
+            if (!is_dir($pluginPath)) {
                 continue;
             }
 
-            $config = include $configPath;
-            if (!is_array($config)) {
+            $infoFile = $pluginPath . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'info.php';
+            // 兼容旧版：如果 config/info.php 不存在，尝试根目录 info.php
+            if (!is_file($infoFile)) {
+                $infoFile = $pluginPath . DIRECTORY_SEPARATOR . 'info.php';
+            }
+            if (!is_file($infoFile)) {
                 continue;
             }
 
-            if (($config['name'] ?? '') === $pluginKey) {
-                return $dir;
+            $info = require $infoFile;
+            if (empty($info['key']) || $info['key'] !== $dir) {
+                continue;
+            }
+
+            $existing = $this->dao->findByKey($dir);
+            $data = [
+                'key'         => $info['key'] ?? $dir,
+                'title'       => $info['title'] ?? $dir,
+                'desc'        => $info['desc'] ?? '',
+                'author'      => $info['author'] ?? '',
+                'version'     => $info['version'] ?? '1.0.0',
+                'type'        => $info['type'] ?? 'custom',
+                'status'      => $info['status'] ?? 1,
+                'icon'        => $info['icon'] ?? '',
+                'cover'       => $info['cover'] ?? '',
+                'support_app' => $info['support_app'] ?? 'admin',
+            ];
+
+            if ($existing) {
+                $this->dao->update($existing->id, $data);
+            } else {
+                $data['id'] = Snowflake::generate();
+                $this->dao->save($data);
             }
         }
-
-        return null;
     }
 
     /**
-     * 更新插件配置文件
-     *
-     * @param string $pluginKey 插件标识
-     * @param array  $data      更新数据
-     *
-     * @return void
-     * @throws \core\exception\handler\AdminException
+     * 创建插件目录结构和文件（匹配 backend/plugin/demo）
      */
-    private function updatePluginConfig(string $pluginKey, array $data): void
+    private function createPluginStructure(string $key, array $data): void
     {
-        // 查找实际的插件目录名
-        $pluginDirName = $this->findPluginDirectory($pluginKey);
-        if (!$pluginDirName) {
-            throw new AdminException('插件目录不存在: ' . $pluginKey);
-        }
-        $configPath = $this->pluginDir . '/' . $pluginDirName . '/config/app.php';
-        // 检查配置文件是否存在
-        if (!file_exists($configPath)) {
-            throw new AdminException('插件配置文件不存在: ' . $configPath);
-        }
-        // 加载当前配置
-        $config = include $configPath;
-        if (!is_array($config)) {
-            throw new AdminException('插件配置文件格式错误');
-        }
-        // 更新配置项
-        $fieldMapping = [
-            'title'   => 'title',
-            'desc'    => 'description',
-            'author'  => 'author',
-            'version' => 'version',
-            'type'    => 'type',
-            'status'  => 'enable',
+        $ds = DIRECTORY_SEPARATOR;
+        $pluginDir = $this->pluginDir . $ds . $key;
+
+        // 创建目录结构（匹配 demo 标准）
+        $dirs = [
+            $pluginDir,
+            $pluginDir . $ds . 'config',
+            $pluginDir . $ds . 'app',
+            $pluginDir . $ds . 'app' . $ds . 'model',
+            $pluginDir . $ds . 'app' . $ds . 'dao',
+            $pluginDir . $ds . 'app' . $ds . 'adminapi' . $ds . 'controller',
+            $pluginDir . $ds . 'app' . $ds . 'adminapi' . $ds . 'validate',
+            $pluginDir . $ds . 'app' . $ds . 'adminapi' . $ds . 'schema',
+            $pluginDir . $ds . 'app' . $ds . 'api' . $ds . 'controller',
+            $pluginDir . $ds . 'app' . $ds . 'api' . $ds . 'validate',
+            $pluginDir . $ds . 'app' . $ds . 'api' . $ds . 'schema',
+            $pluginDir . $ds . 'app' . $ds . 'service' . $ds . 'admin',
+            $pluginDir . $ds . 'app' . $ds . 'service' . $ds . 'api',
+            $pluginDir . $ds . 'public',
+            $pluginDir . $ds . 'resource' . $ds . 'database' . $ds . 'migrations',
+            $pluginDir . $ds . 'resource' . $ds . 'database' . $ds . 'seeds',
+            $pluginDir . $ds . 'resource' . $ds . 'data' . $ds . 'menu',
+            $pluginDir . $ds . 'resource' . $ds . 'data' . $ds . 'config',
+            $pluginDir . $ds . 'resource' . $ds . 'template' . $ds . 'admin',
+            $pluginDir . $ds . 'resource' . $ds . 'template' . $ds . 'web',
         ];
 
-        foreach ($fieldMapping as $dbField => $configField) {
-            if (isset($data[$dbField])) {
-                if ($dbField === 'status') {
-                    // status字段转换为enable布尔值
-                    $config[$configField] = (bool)$data[$dbField];
-                } else {
-                    $config[$configField] = $data[$dbField];
-                }
+        foreach ($dirs as $dir) {
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
             }
         }
 
-        // 生成PHP配置文件内容
-        $phpContent = "<?php\n\nreturn " . $this->arrayToPhpCode($config) . ";\n";
-
-        // 写入配置文件
-        file_put_contents($configPath, $phpContent);
-
-        // 同时更新 info.php 配置文件
-        $this->updatePluginInfoConfig($pluginDirName, $data);
+        // 生成 config/app.php
+        file_put_contents($pluginDir . $ds . 'config' . $ds . 'app.php', $this->buildAppConfig($key, $data));
+        // 生成 config/info.php（合并了 writePluginInfo 和 buildInfoConfig 的字段，可被 syncPlugins 扫描）
+        $this->writePluginInfo($pluginDir, $key, $data);
+        // 生成 config/route.php
+        file_put_contents($pluginDir . $ds . 'config' . $ds . 'route.php', $this->buildRouteConfig($key, $data));
+        // 生成 config/translation.php
+        file_put_contents($pluginDir . $ds . 'config' . $ds . 'translation.php', $this->buildTranslationConfig());
+        // 生成 config/review.php
+        file_put_contents($pluginDir . $ds . 'config' . $ds . 'review.php', $this->buildReviewConfig());
+        // 生成 .gitignore
+        file_put_contents($pluginDir . $ds . '.gitignore', "/config/installed.php\n");
+        // 生成 Install.php（根目录）
+        file_put_contents($pluginDir . $ds . 'Install.php', $this->buildInstallFile($key));
+        // 生成控制器
+        file_put_contents($pluginDir . $ds . 'app' . $ds . 'adminapi' . $ds . 'controller' . $ds . $this->toCamelCase($key) . 'Controller.php', $this->buildControllerFile($key, $data));
+        // 生成菜单
+        file_put_contents($pluginDir . $ds . 'resource' . $ds . 'data' . $ds . 'menu' . $ds . 'admin.php', $this->buildMenuAdmin($key, $data));
+        file_put_contents($pluginDir . $ds . 'resource' . $ds . 'data' . $ds . 'menu' . $ds . 'web.php', "<?php\n\n/**\n * Web 菜单配置\n */\n\nreturn [\n    // Web 菜单配置\n];\n");
+        // 生成前端模板到 resource/template/ 目录
+        $this->generateFrontendTemplates($pluginDir, $ds, $key, $data);
+        // 创建 .gitkeep 文件占位
+        $this->createGitkeepFiles($pluginDir, $ds);
+        // 初始化 public 资源（支持上传的图标/封页 base64 转换）
+        $this->initPublicAssets($pluginDir, $ds, $data);
     }
 
     /**
-     * 创建插件 info.php 配置文件
-     *
-     * @param string $pluginKey 插件标识
-     * @param array  $data      插件数据
-     *
-     * @return void
-     * @throws \core\exception\handler\AdminException
+     * 生成前端模板文件到 resource/template/ 目录
+     * 安装时由 Install.php 的 importTemplates() 复制到前端项目
      */
-    private function createPluginInfoConfig(string $pluginKey, array $data): void
+    private function generateFrontendTemplates(string $pluginDir, string $ds, string $key, array $data): void
     {
-        $pluginDir = $this->pluginDir . '/' . $pluginKey;
-        $configDir = $pluginDir . '/config';
+        $camel    = $this->toCamelCase($key);
+        $title    = $data['title'] ?? $key;
+        $template = $pluginDir . $ds . 'resource' . $ds . 'template';
 
-        // 确保 config 目录存在
+        // ---- Admin 模板 ----
+        $adminDir = $template . $ds . 'admin';
+
+        // 创建按 test 示例模块归类的子目录
+        $pluginSubDirs = [
+            'api' . $ds . 'test',
+            'mock', 'routes',
+            'views' . $ds . 'test', 'views' . $ds . 'test' . $ds . 'schemas',
+        'lang' . $ds . 'zh-CN',
+        'lang' . $ds . 'en-US',
+        ];
+        foreach ($pluginSubDirs as $sub) {
+            $d = $adminDir . $ds . $sub;
+            if (!is_dir($d)) {
+                mkdir($d, 0755, true);
+            }
+        }
+
+        // api/test/index.ts — BaseService 模式
+        file_put_contents($adminDir . $ds . 'api' . $ds . 'test' . $ds . 'index.ts', <<<TS
+import BaseService from '#/api/core/base';
+import { requestClient } from '#/api/request';
+import type { {$camel}Item } from './types';
+
+const baseUrl = '/{$key}';
+
+export const {$camel}Service = {
+  ...BaseService<{$camel}Item>({ baseUrl }),
+
+  /** 获取列表 */
+  getList(params?: Record<string, any>) {
+    return requestClient.get(`\${baseUrl}/index`, { params });
+  },
+
+  /** 获取详情 */
+  getDetail(id: number | string) {
+    return requestClient.get(`\${baseUrl}/view/\${id}`);
+  },
+
+  /** 新增 */
+  createItem(data: Record<string, any>) {
+    return requestClient.post(`\${baseUrl}/create`, data);
+  },
+
+  /** 更新 */
+  updateItem(id: number | string, data: Record<string, any>) {
+    return requestClient.put(`\${baseUrl}/update/\${id}`, data);
+  },
+
+  /** 删除（批量） */
+  deleteItem(ids: number[] | string[]) {
+    return requestClient.delete(`\${baseUrl}/delete`, { data: { ids } });
+  },
+};
+TS
+);
+        // api/test/types.ts
+        file_put_contents($adminDir . $ds . 'api' . $ds . 'test' . $ds . 'types.ts', <<<TS
+/**
+ * {$title} 插件 API 类型定义
+ */
+
+/** {$title} 记录 */
+export interface {$camel}Item {
+  /** 主键 ID */
+  id: number | string;
+  /** 创建时间 */
+  created_at?: string;
+  /** 更新时间 */
+  updated_at?: string;
+  [key: string]: any;
+}
+TS
+);
+        // mock/api.ts（平铺，共享）
+        file_put_contents($adminDir . $ds . 'mock' . $ds . 'api.ts', <<<TS
+import { MOCK_TABLE_DATA } from './table-data';
+
+export function getTableListApi(params: Record<string, any>) {
+  const { page = 1, pageSize = 20 } = params;
+  const items = MOCK_TABLE_DATA.slice((page - 1) * pageSize, page * pageSize);
+  return Promise.resolve({ items, total: MOCK_TABLE_DATA.length });
+}
+TS
+);
+        // mock/table-data.ts（平铺，共享）
+        file_put_contents($adminDir . $ds . 'mock' . $ds . 'table-data.ts', <<<TS
+export const MOCK_TABLE_DATA = Array.from({ length: 50 }, (_, i) => ({
+  id: i + 1,
+  name: `Item \${i + 1}`,
+  status: i % 3 === 0 ? 'enabled' : 'disabled',
+  createdAt: new Date(Date.now() - i * 86400000).toISOString().slice(0, 10),
+}));
+TS
+);
+        // routes/index.ts（平铺，共享，meta 加 module）
+        file_put_contents($adminDir . $ds . 'routes' . $ds . 'index.ts', <<<TS
+import { \$t } from '#/locales';
+
+export default [
+  {
+    path: '/{$key}/index',
+    name: '{$camel}Index',
+    component: 'test/index',
+    meta: {
+      title: \$t('{$key}.test.title'),
+      icon: 'lucide:plugin',
+      order: 1,
+      module: '{$key}',
+    },
+  },
+];
+TS
+);
+        // views/test/schemas/index.tsx — CRUD Schema（Service 模式）
+        file_put_contents($adminDir . $ds . 'views' . $ds . 'test' . $ds . 'schemas' . $ds . 'index.tsx', <<<TS
+import { \$t } from '#/locales';
+import type { CrudSchema } from '#/components/crud/components/types';
+import { {$camel}Service } from '#/plugin/{$key}/api/test';
+
+export function useCrudSchema(): CrudSchema {
+  return {
+    crudApi: {
+      list: {$camel}Service.getList,
+      add: {$camel}Service.createItem,
+      edit: {$camel}Service.updateItem,
+      remove: {$camel}Service.deleteItem,
+      batchRemove: {$camel}Service.deleteItem,
+      view: {$camel}Service.getDetail,
+    },
+    hasAdd: true,
+    hasEdit: true,
+    hasView: true,
+    hasRemove: true,
+    hasBatchRemove: true,
+    permissions: {
+      add: '{$key}:create',
+      edit: '{$key}:update',
+      remove: '{$key}:delete',
+      view: '{$key}:read',
+    },
+    columns: [
+      { type: 'checkbox', width: 60 },
+      { field: 'id', title: 'ID', width: 80, visible: false },
+      { field: 'name', title: \$t('{$key}.test.name'), minWidth: 150 },
+      { field: 'status', title: \$t('{$key}.test.status'), width: 100,
+        cellRender: { name: 'CellDictTag', attrs: { code: 'sys_enabled_status' } } },
+      { field: 'sort', title: \$t('{$key}.test.sort'), width: 80 },
+      { field: 'remark', title: \$t('{$key}.test.remark'), minWidth: 200,
+        showOverflowTooltip: true },
+      { field: 'created_at', title: \$t('{$key}.test.created_at'), width: 180 },
+    ],
+    searchForm: {
+      enabled: true,
+      collapsed: true,
+      collapsedRows: 2,
+      submitOnChange: true,
+      schema: [
+        { component: 'Input', fieldName: 'LIKE_name', label: \$t('{$key}.test.name'),
+          componentProps: { clearable: true, placeholder: ' ' } },
+        { component: 'ApiDict', fieldName: 'EQ_status', label: \$t('{$key}.test.status'),
+          componentProps: { code: 'sys_enabled_status', clearable: true } },
+      ],
+    },
+    formDialog: {
+      enabled: true,
+      title: '{$title}',
+      width: 'w-[50%]',
+      dialogType: 'drawer',
+      wrapperClass: 'grid-cols-2',
+      commonConfig: { labelWidth: 100, labelAlign: 'right' },
+      schema: [
+        { fieldName: 'id', label: 'ID', component: 'Input',
+          dependencies: { triggerFields: ['id'], show: false } },
+        { fieldName: 'name', label: \$t('{$key}.test.name'), component: 'Input',
+          rules: 'required', formItemClass: 'col-span-1' },
+        { fieldName: 'status', label: \$t('{$key}.test.status'), component: 'ApiDict',
+          defaultValue: 1,
+          componentProps: { code: 'sys_enabled_status', renderType: 'RadioGroup', isBtn: true } },
+        { fieldName: 'sort', label: \$t('{$key}.test.sort'), component: 'InputNumber',
+          defaultValue: 0, componentProps: { min: 0, max: 99999 } },
+        { fieldName: 'remark', label: \$t('{$key}.test.remark'), component: 'Textarea',
+          formItemClass: 'col-span-2' },
+      ],
+    },
+  };
+}
+TS
+);
+        // views/test/index.vue — 标准 CRUD 视图
+        file_put_contents($adminDir . $ds . 'views' . $ds . 'test' . $ds . 'index.vue', <<<VUE
+<script setup lang="ts">
+import { useCrud } from '#/adapter/crud';
+import { Page } from '#/components/page';
+import { useCrudSchema } from './schemas';
+
+const [BasicCrud] = useCrud(useCrudSchema());
+</script>
+
+<template>
+  <Page auto-content-height>
+    <BasicCrud />
+  </Page>
+</template>
+VUE
+);
+        // lang/zh-CN/test.json
+        file_put_contents($adminDir . $ds . 'lang' . $ds . 'zh-CN' . $ds . 'test.json',
+            json_encode([
+                'title'      => $title,
+                'name'       => '名称',
+                'status'     => '状态',
+                'sort'       => '排序',
+                'remark'     => '备注',
+                'created_at' => '创建时间',
+            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n");
+        // lang/en-US/test.json
+        file_put_contents($adminDir . $ds . 'lang' . $ds . 'en-US' . $ds . 'test.json',
+            json_encode([
+                'title'      => $title,
+                'name'       => 'Name',
+                'status'     => 'Status',
+                'sort'       => 'Sort',
+                'remark'     => 'Remark',
+                'created_at' => 'Created At',
+            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n");
+
+        // ---- Web 模板 ----
+        $webDir = $template . $ds . 'web';
+        $pagesDir = $webDir . $ds . 'pages';
+        if (!is_dir($pagesDir)) {
+            mkdir($pagesDir, 0755, true);
+        }
+        // pages/routes.ts
+        file_put_contents($webDir . $ds . 'pages' . $ds . 'routes.ts', "export default [\n\n]\n");
+    }
+
+    /**
+     * 为空目录创建 .gitkeep
+     */
+    private function createGitkeepFiles(string $pluginDir, string $ds): void
+    {
+        $paths = [
+            'app' . $ds . 'model',
+            'app' . $ds . 'dao',
+            'app' . $ds . 'adminapi' . $ds . 'validate',
+            'app' . $ds . 'adminapi' . $ds . 'schema',
+            'app' . $ds . 'api' . $ds . 'controller',
+            'app' . $ds . 'api' . $ds . 'validate',
+            'app' . $ds . 'api' . $ds . 'schema',
+            'app' . $ds . 'service' . $ds . 'admin',
+            'app' . $ds . 'service' . $ds . 'api',
+            'resource' . $ds . 'database' . $ds . 'migrations',
+            'resource' . $ds . 'database' . $ds . 'seeds',
+            'resource' . $ds . 'data' . $ds . 'config',
+        ];
+        foreach ($paths as $path) {
+            $dir = $pluginDir . $ds . $path;
+            if (is_dir($dir)) {
+                file_put_contents($dir . $ds . '.gitkeep', '');
+            }
+        }
+    }
+
+    /**
+     * 初始化 public 资源（支持上传的图标/封页 base64 转换）
+     */
+    private function initPublicAssets(string $pluginDir, string $ds, array $data = []): void
+    {
+        $publicDir = $pluginDir . $ds . 'public';
+        if (!is_dir($publicDir)) {
+            mkdir($publicDir, 0755, true);
+        }
+        // icon.png - 尝试 base64 转换，失败则自动兜底占位图
+        $iconPath = $publicDir . $ds . 'icon.png';
+        if (!empty($data['icon'])) {
+            $this->saveBase64Image($data['icon'], $iconPath);
+        }
+        if (!file_exists($iconPath)) {
+            $this->savePlaceholderPng($iconPath, true);
+        }
+        // cover.png - 尝试 base64 转换，失败则自动兜底占位图
+        $coverPath = $publicDir . $ds . 'cover.png';
+        if (!empty($data['cover'])) {
+            $this->saveBase64Image($data['cover'], $coverPath);
+        }
+        if (!file_exists($coverPath)) {
+            $this->savePlaceholderPng($coverPath, false);
+        }
+    }
+
+    /**
+     * 保存 base64 图片
+     */
+    private function saveBase64Image(string $data, string $path): void
+    {
+        // 去掉 data:image/...;base64, 前缀
+        if (str_contains($data, 'base64,')) {
+            $data = substr($data, strpos($data, 'base64,') + 7);
+        }
+        $decoded = base64_decode($data, true);
+        if ($decoded !== false) {
+            file_put_contents($path, $decoded);
+        }
+    }
+
+    /**
+     * 保存占位 PNG（可见图像，非透明）
+     */
+    private function savePlaceholderPng(string $path, bool $forIcon): void
+    {
+        if ($forIcon) {
+            // 60x60 蓝色方块带白色圆点（可见图标）
+            $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAADwAAAA8CAIAAAC1nk4lAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAA7UlEQVRoge3avQ3CMBiEYQchMRcbMAw9omcYNmAlCgroKNxAEgfiO11iffd25Ac9+oQSW6K7P56ptTZLA2oyWpXRqoxWtS2dOFx2Skep6/E1PNjkpI1WZbQqo1UZrcpoVcW1B9Lt9PVxfyZ/Pxnd414eJNJp6FHu8AIKnfOb/imuuHIiAnquA3c3+fRA0XVjA4cdb9LIwJB74016qYxWBaGRdzJyb7xJp9qBgcumkJNO88eGr045k/7fQVlP0zYBWTPxcl7jziU3Sl/7HjFHV/aK+vTQZ7Qqo1UZrcpoVU2iO//xSpTRqoxW1ST6DTNZJ/95fTe6AAAAAElFTkSuQmCC');
+        } else {
+            // 300x160 蓝色头部 + 灰色色块（可见封面）
+            $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAASwAAACgCAIAAAA5GsY1AAAACXBIWXMAAA7EAAAOxAGVKw4bAAACBUlEQVR4nO3VoRHCQBRFUcJQBgpFGZRGmSgUBURExAWHAAnMFXuO351n7vzpct12QGdfD4DRiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIITbNy1pvgKG5hBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBNh86z1Bhiay3/gwOHD7QkAAAAASUVORK5CYII=');
+        }
+        file_put_contents($path, $png);
+    }
+
+    /**
+     * 转驼峰命名
+     */
+    private function toCamelCase(string $string): string
+    {
+        return str_replace(' ', '', ucwords(str_replace('_', ' ', $string)));
+    }
+
+    /**
+     * 构建 app.php
+     */
+    private function buildAppConfig(string $key, array $data): string
+    {
+        $stub = file_get_contents(__DIR__ . '/../../core/plugin/stubs/admin/app/config.stub');
+        return str_replace(
+            ['{{pluginVersion}}', '{{pluginTitle}}', '{{pluginDesc}}', '{{pluginAuthor}}'],
+            [$data['version'], $data['title'], $data['desc'], $data['author']],
+            $stub
+        );
+    }
+
+    /**
+     * 构建 route.php
+     */
+    private function buildRouteConfig(string $key, array $data): string
+    {
+        $stub = file_get_contents(__DIR__ . '/../../core/plugin/stubs/admin/route/route.stub');
+        return str_replace(
+            ['{{pluginKey}}', '{{kebabPluginKey}}', '{{pluginTitle}}', '{{pluginVersion}}'],
+            [$key, str_replace('_', '-', $key), $data['title'], $data['version']],
+            $stub
+        );
+    }
+
+    /**
+     * 构建 translation.php
+     */
+    private function buildTranslationConfig(): string
+    {
+        return "<?php\n\n/**\n * Multilingual configuration\n */\n\nuse app\\enum\\common\\LangEnum;\n\nreturn [\n    'locale'          => config('app.lang'),\n    'fallback_locale' => ['zh_CN', 'en'],\n    'path'            => base_path() . '/resource/translations',\n];\n";
+    }
+
+    /**
+     * 构建 review.php
+     */
+    private function buildReviewConfig(): string
+    {
+        return "<?php\n\nreturn [\n    /*\n     * 审核配置\n     * 用于定义数据审核流程中的字段映射规则\n     */\n];\n";
+    }
+
+    /**
+     * 构建 Install.php
+     */
+    private function buildInstallFile(string $key): string
+    {
+        $stub = file_get_contents(__DIR__ . '/../../core/plugin/stubs/admin/install/Install.stub');
+        return str_replace(
+            ['{{pluginKey}}', '{{camelPluginKey}}'],
+            [$key, $this->toCamelCase($key)],
+            $stub
+        );
+    }
+
+    /**
+     * 构建控制器文件
+     */
+    private function buildControllerFile(string $key, array $data): string
+    {
+        $stub = file_get_contents(__DIR__ . '/../../core/plugin/stubs/admin/controller/Controller.stub');
+        return str_replace(
+            ['{{pluginKey}}', '{{camelPluginKey}}', '{{kebabPluginKey}}'],
+            [$key, $this->toCamelCase($key), str_replace('_', '-', $key)],
+            $stub
+        );
+    }
+
+    /**
+     * 构建 admin 菜单配置
+     */
+    private function buildMenuAdmin(string $key, array $data): string
+    {
+        $stub = file_get_contents(__DIR__ . '/../../core/plugin/stubs/admin/menu/menu.stub');
+        return str_replace(
+            ['{{pluginTitle}}', '{{kebabPluginKey}}'],
+            [$data['title'] ?? $key, str_replace('_', '-', $key)],
+            $stub
+        );
+    }
+
+    /**
+     * 写入插件配置信息到 config/info.php
+     * 合并了 Demo 标准字段 + syncPlugins 扫描所需字段
+     */
+    private function writePluginInfo(string $pluginDir, string $key, array $data): void
+    {
+        $configDir = $pluginDir . DIRECTORY_SEPARATOR . 'config';
         if (!is_dir($configDir)) {
             mkdir($configDir, 0755, true);
         }
-
-        $infoConfig = [
-            'name'          => $pluginKey,
-            'identifier'    => $pluginKey,
-            'type'          => $data['type'] ?? 'madong', // 插件归属类型：madong(官方)、third(第三方)、custom(自定义)
-            'version'       => $data['version'] ?? '1.0.0',
-            'description'   => $data['desc'] ?? '',
-            'author'        => $data['author'] ?? '',
-            'author_email'  => $data['author_email'] ?? '',
-            'website'       => $data['website'] ?? '',
-            'uninstall'     => [
+        $infoFile = $configDir . DIRECTORY_SEPARATOR . 'info.php';
+        $info = [
+            // Demo 标准字段（config/info.php）
+            'name'         => $key,
+            'identifier'   => $key,
+            // syncPlugins 扫描字段
+            'key'          => $key,
+            'title'        => $data['title'] ?? $key,
+            'description'  => $data['desc'] ?? '',
+            'desc'         => $data['desc'] ?? '',
+            'author'       => $data['author'] ?? '未知',
+            'author_email' => '',
+            'version'      => $data['version'] ?? '1.0.0',
+            'type'         => $data['type'] ?? 'madong:app',
+            'website'      => 'https://madong.tech',
+            'icon'         => $data['icon'] ?? '',
+            'cover'        => $data['cover'] ?? '',
+            'support_app'  => $data['support_app'] ?? '',
+            'status'       => 1,
+            'uninstall'    => [
                 'drop_tables'         => false,
                 'remove_dependencies' => false,
             ],
         ];
-
-        $phpContent = "<?php\n\n/**\n * 插件信息配置\n */\n\nreturn " . $this->arrayToPhpCode($infoConfig) . ";\n";
-        file_put_contents($configDir . '/info.php', $phpContent);
+        file_put_contents($infoFile, '<?php return ' . var_export($info, true) . ';');
     }
-
-    /**
-     * 更新插件 info.php 配置文件
-     *
-     * @param string $pluginDirName 插件目录名
-     * @param array  $data          更新数据
-     *
-     * @return void
-     * @throws \core\exception\handler\AdminException
-     */
-    private function updatePluginInfoConfig(string $pluginDirName, array $data): void
-    {
-        $infoPath = $this->pluginDir . '/' . $pluginDirName . '/config/info.php';
-
-        // 如果 info.php 不存在，则创建
-        if (!file_exists($infoPath)) {
-            $this->createPluginInfoConfig($pluginDirName, $data);
-            return;
-        }
-
-        // 加载当前配置
-        $infoConfig = include $infoPath;
-        if (!is_array($infoConfig)) {
-            $infoConfig = [];
-        }
-
-        // 更新配置项
-        $fieldMapping = [
-            'type'          => 'type',
-            'version'       => 'version',
-            'desc'          => 'description',
-            'author'        => 'author',
-            'author_email'  => 'author_email',
-            'website'       => 'website',
-        ];
-
-        foreach ($fieldMapping as $dbField => $infoField) {
-            if (isset($data[$dbField])) {
-                $infoConfig[$infoField] = $data[$dbField];
-            }
-        }
-
-        // 确保必要的字段存在
-        if (!isset($infoConfig['name'])) {
-            $infoConfig['name'] = $pluginDirName;
-        }
-        if (!isset($infoConfig['identifier'])) {
-            $infoConfig['identifier'] = $pluginDirName;
-        }
-        if (!isset($infoConfig['type'])) {
-            $infoConfig['type'] = 'madong'; // 默认归属 madong
-        }
-        if (!isset($infoConfig['uninstall'])) {
-            $infoConfig['uninstall'] = [
-                'drop_tables'         => false,
-                'remove_dependencies' => false,
-            ];
-        }
-
-        // 生成PHP配置文件内容
-        $phpContent = "<?php\n\n/**\n * 插件信息配置\n */\n\nreturn " . $this->arrayToPhpCode($infoConfig) . ";\n";
-
-        // 写入配置文件
-        file_put_contents($infoPath, $phpContent);
-    }
-
-    /**
-     * 将数组转换为PHP代码格式
-     *
-     * @param array $array 数组
-     * @param int   $level 缩进级别
-     *
-     * @return string
-     */
-    private function arrayToPhpCode(array $array, int $level = 1): string
-    {
-        $indent     = str_repeat('    ', $level);
-        $nextIndent = str_repeat('    ', $level + 1);
-
-        $result = "[\n";
-
-        foreach ($array as $key => $value) {
-            if (is_numeric($key)) {
-                $result .= $nextIndent;
-            } else {
-                $result .= $nextIndent . "'{$key}' => ";
-            }
-
-            if (is_array($value)) {
-                $result .= $this->arrayToPhpCode($value, $level + 1);
-            } elseif (is_bool($value)) {
-                $result .= $value ? 'true' : 'false';
-            } elseif (is_null($value)) {
-                $result .= 'null';
-            } elseif (is_string($value)) {
-                // 转义单引号
-                $escaped = str_replace("'", "\\'", $value);
-                $result  .= "'{$escaped}'";
-            } else {
-                $result .= $value;
-            }
-
-            $result .= ",\n";
-        }
-
-        $result .= $indent . ']';
-
-        return $result;
-    }
-
-    /**
-     * 保存base64图片到文件
-     *
-     * @param string $base64     base64编码的图片
-     * @param string $targetPath 目标路径
-     *
-     * @return void
-     */
-    private function saveBase64Image(string $base64, string $targetPath): void
-    {
-        // 提取base64数据
-        if (preg_match('/^data:image\/(\w+);base64,/', $base64, $matches)) {
-            $imageData = substr($base64, strpos($base64, ',') + 1);
-            $imageData = base64_decode($imageData);
-            if ($imageData !== false) {
-                file_put_contents($targetPath, $imageData);
-            }
-        }
-    }
-
-    /**
-     * 生成默认图标（64x64）
-     *
-     * @param string $text 文字
-     *
-     * @return string base64编码的图片
-     */
-    private function generateDefaultIcon(string $text): string
-    {
-        // 提取首字母
-        $firstChar = mb_substr($text, 0, 1, 'UTF-8');
-
-        // 创建64x64的图像
-        $size  = 64;
-        $image = imagecreatetruecolor($size, $size);
-
-        // 分配颜色
-        $bgColor   = imagecolorallocate($image, 64, 158, 255); // 蓝色背景 #409EFF
-        $textColor = imagecolorallocate($image, 255, 255, 255); // 白色文字
-
-        // 填充背景
-        imagefill($image, 0, 0, $bgColor);
-
-        // 绘制圆角矩形
-        $radius  = 12;
-        $corners = [
-            [0, 0], [$size - 1, 0],
-            [0, $size - 1], [$size - 1, $size - 1],
-        ];
-
-        foreach ($corners as $corner) {
-            imagefilledarc($image, $corner[0] + $radius, $corner[1] + $radius, $radius * 2, $radius * 2, 0, 360, $bgColor, IMG_ARC_PIE);
-        }
-
-        // 添加文字
-        $fontSize = 24;
-        $fontFile = $this->getFontFile();
-        if ($fontFile && file_exists($fontFile)) {
-            $bbox       = imagettfbbox($fontSize, 0, $fontFile, $firstChar);
-            $textWidth  = $bbox[2] - $bbox[0];
-            $textHeight = $bbox[7] - $bbox[1];
-            $x          = ($size - $textWidth) / 2 - $bbox[0];
-            $y          = ($size - $textHeight) / 2 - $bbox[1];
-            imagettftext($image, $fontSize, 0, $x, $y, $textColor, $fontFile, $firstChar);
-        } else {
-            // 如果没有字体文件，使用内置字体
-            imagestring($image, 5, ($size - imagefontwidth(5)) / 2, ($size - imagefontheight(5)) / 2, $firstChar, $textColor);
-        }
-
-        // 转换为base64
-        ob_start();
-        imagepng($image);
-        $imageData = ob_get_clean();
-        imagedestroy($image);
-
-        return 'data:image/png;base64,' . base64_encode($imageData);
-    }
-
-    /**
-     * 生成默认封面（200x120）
-     *
-     * @param string $text 文字
-     *
-     * @return string base64编码的图片
-     */
-    private function generateDefaultCover(string $text): string
-    {
-        // 创建200x120的图像
-        $width  = 200;
-        $height = 120;
-        $image  = imagecreatetruecolor($width, $height);
-
-        // 分配颜色
-        $bgColor   = imagecolorallocate($image, 240, 242, 245); // 浅灰色背景 #F0F2F5
-        $lineColor = imagecolorallocate($image, 220, 223, 230); // 线条颜色 #DCDFE6
-        $textColor = imagecolorallocate($image, 144, 147, 153); // 文字颜色 #909399
-
-        // 填充背景
-        imagefill($image, 0, 0, $bgColor);
-
-        // 绘制圆角
-        $radius  = 8;
-        $corners = [
-            [0, 0], [$width - 1, 0],
-            [0, $height - 1], [$width - 1, $height - 1],
-        ];
-
-        foreach ($corners as $corner) {
-            imagefilledarc($image, $corner[0] + $radius, $corner[1] + $radius, $radius * 2, $radius * 2, 0, 360, $bgColor, IMG_ARC_PIE);
-        }
-
-        // 绘制虚线边框
-        imagesetthickness($image, 1);
-        imagerectangle($image, 1, 1, $width - 2, $height - 2, $lineColor);
-
-        // 绘制中间的+号
-        $plusSize = 24;
-        $centerX  = $width / 2;
-        $centerY  = $height / 2;
-
-        imagesetthickness($image, 2);
-        imageline($image, $centerX - $plusSize, $centerY, $centerX + $plusSize, $centerY, $textColor);
-        imageline($image, $centerX, $centerY - $plusSize, $centerX, $centerY + $plusSize, $textColor);
-
-        // 转换为base64
-        ob_start();
-        imagepng($image);
-        $imageData = ob_get_clean();
-        imagedestroy($image);
-
-        return 'data:image/png;base64,' . base64_encode($imageData);
-    }
-
-    /**
-     * 获取字体文件路径
-     *
-     * @return string|null
-     */
-    private function getFontFile(): ?string
-    {
-        $fontPaths = [
-            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', // Linux
-            'C:/Windows/Fonts/msyh.ttc', // Windows 微软雅黑
-            'C:/Windows/Fonts/simhei.ttf', // Windows 黑体
-            '/System/Library/Fonts/PingFang.ttc', // macOS
-        ];
-
-        foreach ($fontPaths as $path) {
-            if (file_exists($path)) {
-                return $path;
-            }
-        }
-
-        return null;
-    }
-
 }

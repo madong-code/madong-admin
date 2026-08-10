@@ -1,10 +1,20 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\adminapi\validate\web;
 
 use app\model\web\Menu;
-use core\base\BaseValidate;
+use core\foundation\base\BaseValidate;
 use Illuminate\Validation\Rule;
 
 /**
@@ -42,7 +52,7 @@ class MenuValidate extends BaseValidate
     /**
      * 验证消息
      */
-    protected array $message = [
+    protected array $messages = [
         'id.string' => 'ID必须为字符串或整数',
         'id.integer' => 'ID必须为字符串或整数',
         'app.max' => '应用名称不能超过50个字符',
@@ -71,7 +81,7 @@ class MenuValidate extends BaseValidate
     /**
      * 验证场景
      */
-    protected array $scene = [
+    protected array $scenes = [
         'store' => [
             'id',
             'app',

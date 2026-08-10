@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -10,7 +11,6 @@ declare(strict_types=1);
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 
 namespace app\schema\response;
 

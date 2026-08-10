@@ -1,12 +1,22 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\dao\member;
 
 use app\scope\global\AccessPermissionScope;
 use app\service\admin\member\MemberTagRelationService;
 use app\service\admin\member\MemberTagService;
-use core\base\BaseDao;
+use core\foundation\base\BaseDao;
 use app\model\member\Member;
 use madong\query\QueryBuilderHelper;
 use madong\query\QueryParamConverter;
@@ -156,5 +166,4 @@ class MemberDao extends BaseDao
     }
 
 }
-
 

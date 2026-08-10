@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -20,13 +21,13 @@ use app\adminapi\middleware\PermissionMiddleware;
 use app\adminapi\schema\request\system\AdminFormRequest;
 use app\adminapi\schema\request\system\AdminQueryRequest;
 use app\adminapi\schema\response\system\AdminResponse;
-use app\adminapi\validate\system\AdminValidate;
+use app\adminapi\validate\system\admin\AdminValidate;
 use app\schema\request\BatchDeleteRequest;
 use app\schema\request\IdRequest;
-use app\service\admin\system\AdminRoleService;
-use app\service\admin\system\AdminService;
-use core\exception\handler\AdminException;
-use core\tool\Json;
+use app\service\admin\system\admin\AdminRoleService;
+use app\service\admin\system\admin\AdminService;
+use core\foundation\exception\handler\AdminException;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\PageResponse;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\Permission;
@@ -360,7 +361,6 @@ final class AdminController extends Crud
             return Json::fail($e->getMessage());
         }
     }
-
 
     #[OA\Delete(
         path: '/system/admin/{id}',

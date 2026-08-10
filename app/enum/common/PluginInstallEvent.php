@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  *+------------------
@@ -10,10 +11,9 @@
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 namespace app\enum\common;
 
-use core\interface\IEnum;
+use core\foundation\interface\IEnum;
 
 enum PluginInstallEvent: string implements IEnum
 {

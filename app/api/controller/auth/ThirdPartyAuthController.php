@@ -1,12 +1,22 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\api\controller\auth;
 
 use app\api\controller\Base;
 use app\api\validate\auth\ThirdPartyAuthValidate;
 use app\service\api\auth\ThirdPartyAuthService;
-use core\tool\Json;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
 use support\Request;

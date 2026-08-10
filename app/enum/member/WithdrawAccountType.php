@@ -1,11 +1,19 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\enum\member;
 
-
-
-use core\interface\IEnum;
+use core\foundation\interface\IEnum;
 
 /**
  * 提现账号类型枚举

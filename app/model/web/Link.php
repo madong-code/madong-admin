@@ -1,17 +1,29 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\model\web;
 
 use app\enum\common\EnabledStatus;
 use app\enum\web\MenuTarget;
-use core\base\BaseModel;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use core\foundation\base\BaseModel;
 
 /**
  * 友情链接模型
  */
 class Link extends BaseModel
 {
+    use SoftDeletes;
     /**
      * 数据表名称
      */
@@ -45,9 +57,10 @@ class Link extends BaseModel
      * 类型转换
      */
     protected $casts = [
-        'enabled' => 'integer',
-        'sort' => 'integer',
         'click_count' => 'integer',
+        'enabled'     => 'integer',
+        'id'          => 'string',
+        'sort'        => 'integer',
     ];
 
     /**

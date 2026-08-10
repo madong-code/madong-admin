@@ -19,14 +19,13 @@ use app\adminapi\controller\Crud;
 use app\adminapi\middleware\AccessTokenMiddleware;
 use app\adminapi\middleware\OperationMiddleware;
 use app\adminapi\middleware\PermissionMiddleware;
-use app\service\admin\system\RuleService;
-use core\tool\Json;
+use app\service\admin\system\role\RuleService;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\Permission;
 use OpenApi\Attributes as OA;
 use support\annotation\Middleware;
 use support\Request;
-
 
 #[Middleware(AccessTokenMiddleware::class, PermissionMiddleware::class, OperationMiddleware::class)]
 final class RuleController extends Crud

@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -7,9 +9,8 @@
  *+------------------
  * Author: Mr. April (405784684@qq.com)
  *+------------------
- * Official Website: https://madong.tech
+ * Official Website: http://www.madong.tech
  */
-
 namespace app\adminapi\schema\response\system;
 
 use madong\swagger\schema\BaseResponseDTO;
@@ -94,15 +95,6 @@ class AdminResponse extends BaseResponseDTO
         enum: [0, 1]
     )]
     public int $is_super;
-
-    #[OA\Property(
-        property: 'is_tenant_admin',
-        description: '是否租户管理员(0:否,1:是)',
-        type: 'integer',
-        example: 1,
-        enum: [0, 1]
-    )]
-    public int $is_tenant_admin;
 
     #[OA\Property(
         property: 'created_at',

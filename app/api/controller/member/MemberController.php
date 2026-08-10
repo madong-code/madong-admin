@@ -1,14 +1,26 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\api\controller\member;
 
 use app\api\controller\Base;
 use app\api\CurrentMember;
-use app\api\event\MemberInfoFetchedEvent;
+use app\api\event\member\MemberInfoFetchedEvent;
+use app\service\api\member\MemberBalanceService;
+use app\service\api\member\MemberBindService;
 use app\service\api\member\MemberService;
-use core\exception\handler\UnauthorizedHttpException;
-use core\tool\Json;
+use core\foundation\exception\handler\UnauthorizedHttpException;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
 use OpenApi\Attributes as OA;
@@ -23,9 +35,17 @@ use Webman\Http\UploadFile as WebmanUploadFile;
 #[OA\Tag(name: '会员模块')]
 final class MemberController extends Base
 {
-    public function __construct(MemberService $service)
-    {
+    protected MemberBalanceService $balanceService;
+    protected MemberBindService $bindService;
+
+    public function __construct(
+        MemberService $service,
+        MemberBalanceService $balanceService,
+        MemberBindService $bindService
+    ) {
         $this->service = $service;
+        $this->balanceService = $balanceService;
+        $this->bindService = $bindService;
     }
 
     #[OA\Get(
@@ -170,9 +190,13 @@ final class MemberController extends Base
     #[AllowAnonymous(requireToken: false, requirePermission: false, description: '公共接口')]
     public function bindPhone(Request $request): Response
     {
-        $data   = $request->post();
-        $result = $this->service->bindPhone($data);
-        return json($result);
+        try {
+            $data   = $request->post();
+            $result = $this->service->bindPhone($data);
+            return Json::success($result['msg'] ?? '绑定成功', $result);
+        } catch (\Exception $e) {
+            return Json::fail($e->getMessage());
+        }
     }
 
     #[OA\Put(
@@ -327,6 +351,91 @@ final class MemberController extends Base
         try {
             $result = $this->service->deleteAddress($id);
             return Json::success('删除成功', $result);
+        } catch (\Exception $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    #[OA\Get(
+        path: '/member/balance/record',
+        summary: '获取余额流水记录',
+        tags: ['会员模块'],
+        parameters: [
+            new OA\Parameter(name: 'page', description: '页码', in: 'query', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'page_size', description: '每页数量', in: 'query', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: '获取成功'),
+            new OA\Response(response: 401, description: '未登录'),
+        ]
+    )]
+    #[SimpleResponse(schema: [], example: [])]
+    #[AllowAnonymous(requireToken: false, requirePermission: false, description: '公共接口')]
+    public function getBalanceRecords(Request $request): Response
+    {
+        $params = $request->all();
+        try {
+            $result = $this->balanceService->getBalanceRecords($params);
+            return Json::success('获取成功', $result);
+        } catch (\Throwable $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    #[OA\Get(
+        path: '/member/balance/all',
+        summary: '获取所有余额流水记录',
+        tags: ['会员模块'],
+        parameters: [
+            new OA\Parameter(name: 'page', description: '页码', in: 'query', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'page_size', description: '每页数量', in: 'query', schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: '获取成功'),
+            new OA\Response(response: 401, description: '未登录'),
+        ]
+    )]
+    #[SimpleResponse(schema: [], example: [])]
+    #[AllowAnonymous(requireToken: false, requirePermission: false, description: '公共接口')]
+    public function getAllBalanceRecords(Request $request): Response
+    {
+        $params = $request->all();
+        try {
+            $result = $this->balanceService->getAllBalanceRecords($params);
+            return Json::success('获取成功', $result);
+        } catch (\Throwable $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    #[OA\Put(
+        path: '/member/user/update-email',
+        summary: '更新会员邮箱',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['email', 'verify_code'],
+                properties: [
+                    new OA\Property(property: 'email', description: '邮箱', type: 'string'),
+                    new OA\Property(property: 'verify_code', description: '验证码', type: 'string'),
+                ]
+            )
+        ),
+        tags: ['会员模块'],
+        responses: [
+            new OA\Response(response: 200, description: '更新成功'),
+            new OA\Response(response: 401, description: '未登录'),
+            new OA\Response(response: 400, description: '参数错误'),
+        ]
+    )]
+    #[SimpleResponse(schema: [], example: [])]
+    #[AllowAnonymous(requireToken: false, requirePermission: false, description: '公共接口')]
+    public function updateEmail(Request $request): Response
+    {
+        try {
+            $data = $request->post();
+            $this->service->updateEmail($data);
+            return Json::success('更新成功');
         } catch (\Exception $e) {
             return Json::fail($e->getMessage());
         }

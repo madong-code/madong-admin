@@ -1,14 +1,24 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\service\admin\member;
 
 use app\dao\member\MemberDao;
 use app\enum\member\PointSource;
 use app\enum\member\PointType;
-use app\adminapi\event\PointsChangedEvent;
-use core\base\BaseService;
-use core\exception\handler\AdminException;
+use app\adminapi\event\member\PointsChangedEvent;
+use core\foundation\base\BaseService;
+use core\foundation\exception\handler\AdminException;
 use support\Container;
 
 /**

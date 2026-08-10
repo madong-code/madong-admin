@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -20,14 +21,14 @@ use app\adminapi\middleware\PermissionMiddleware;
 use app\adminapi\schema\request\system\RoleFormRequest;
 use app\adminapi\schema\request\system\RoleQueryRequest;
 use app\adminapi\schema\response\system\RoleResponse;
-use app\adminapi\validate\system\RoleValidate;
+use app\adminapi\validate\system\role\RoleValidate;
 use app\schema\request\BatchDeleteRequest;
 use app\schema\request\IdRequest;
 use app\scope\global\AccessPermissionScope;
-use app\service\admin\org\DeptService;
-use app\service\admin\system\RoleService;
-use core\exception\handler\AdminException;
-use core\tool\Json;
+use app\service\admin\system\org\DeptService;
+use app\service\admin\system\role\RoleService;
+use core\foundation\exception\handler\AdminException;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\PageResponse;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\Permission;
@@ -79,7 +80,7 @@ final class RoleController extends Crud
             $id   = $request->route->param('id');
             $data = $this->service->get($id, ['*'], ['scopes']);
             if (empty($data)) {
-                throw new AdminException('数据未找到', ['errorCode' => 400]);
+                throw new AdminException('数据未找到', 400);
             }
             return Json::success('ok', $data->toArray());
         } catch (\Throwable $e) {
@@ -139,6 +140,7 @@ final class RoleController extends Crud
         try {
             $id   = $request->route->param('id');
             $data = $this->inputFilter($request->all(), ['permissions', 'scopes']);
+            $data['id'] = $id;
             if (isset($this->validate) && $this->validate) {
                 if (!$this->validate->scene('update')->check($data)) {
                     throw new \Exception($this->validate->getError());
@@ -205,6 +207,7 @@ final class RoleController extends Crud
         try {
             $id   = $request->route->param('id');
             $data = $this->inputFilter($request->all(), ['scopes']);
+            $data['id'] = $id;
             if (isset($this->validate) && $this->validate) {
                 if (!$this->validate->scene('data-scope')->check($data)) {
                     throw new \Exception($this->validate->getError());

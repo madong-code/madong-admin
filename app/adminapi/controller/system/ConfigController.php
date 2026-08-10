@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -20,8 +21,8 @@ use app\adminapi\middleware\PermissionMiddleware;
 use app\adminapi\schema\request\system\ConfigGroupQueryRequest;
 use app\adminapi\schema\request\system\ConfigQueryRequest;
 use app\adminapi\schema\request\system\ConfigValueRequest;
-use app\service\admin\system\ConfigService;
-use core\tool\Json;
+use app\service\admin\system\config\ConfigService;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
 use madong\swagger\attribute\Permission;
@@ -37,7 +38,6 @@ final class ConfigController extends Crud
     {
         $this->service = $service;
     }
-
 
     #[OA\Get(
         path: "/system/config/group/{group_code}",
@@ -84,6 +84,7 @@ final class ConfigController extends Crud
         required: true,
         schema: new OA\Schema(type: "string"),
     )]
+    // 配置为全局数据且不做数据权限隔离，登录前（登录页品牌信息）与登录后共用此接口
     #[AllowAnonymous(requireToken: false, requirePermission: false)]
     #[SimpleResponse(schema: [], example: ' {"site_open": "1","site_url": "http://127.0.0.1:8001"}')]
     public function getByCode(Request $request, string $code): \support\Response
@@ -94,7 +95,7 @@ final class ConfigController extends Crud
                 return Json::fail('配置编码不能为空');
             }
 
-            $groupCode = $request->input('group_code', '');
+            $groupCode = $request->input('group_code', 'default');
             $options   = [];
             if (!empty($groupCode)) {
                 $options['group_code'] = $groupCode;
@@ -230,7 +231,6 @@ final class ConfigController extends Crud
         }
     }
 
-
     #[OA\Put(
         path: "/system/config/{code}/value",
         summary: "更新特定配置项的特定键值",
@@ -264,7 +264,6 @@ final class ConfigController extends Crud
             return Json::fail($e->getMessage());
         }
     }
-
 
     #[OA\Get(
         path: "/system/config/all-grouped",
@@ -337,7 +336,6 @@ final class ConfigController extends Crud
             return Json::fail($e->getMessage());
         }
     }
-
 
     #[OA\Get(
         path: "/system/config/items",
@@ -483,8 +481,6 @@ final class ConfigController extends Crud
             return Json::fail($e->getMessage());
         }
     }
-
-
 
     #[OA\Put(
         path: "/system/config/item/{id}/toggle",

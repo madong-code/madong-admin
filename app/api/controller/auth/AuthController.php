@@ -1,14 +1,24 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\api\controller\auth;
 
 use app\api\controller\Base;
 use app\api\validate\auth\LoginValidate;
 use app\api\validate\auth\RegisterValidate;
 use app\service\api\auth\AuthService;
-use core\captcha\Captcha;
-use core\tool\Json;
+use core\security\captcha\Captcha;
+use core\foundation\tool\Json;
 use Exception;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
@@ -345,7 +355,7 @@ final class AuthController extends Base
     public function refresh(): Response
     {
         try {
-            $jwt   = new \core\jwt\JwtToken();
+            $jwt   = new \core\security\jwt\JwtToken();
             $token = $jwt->refresh();
             return Json::success('ok', [
                 'access_token'  => $token->accessToken,

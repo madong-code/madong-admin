@@ -1,10 +1,20 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\service\api\system;
 
-use app\model\system\Config;
-use core\base\BaseService;
+use app\model\system\config\Config;
+use core\foundation\base\BaseService;
 use support\Redis;
 
 /**

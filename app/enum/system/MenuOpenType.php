@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -13,7 +14,7 @@ declare(strict_types=1);
 
 namespace app\enum\system;
 
-use core\interface\IEnum;
+use core\foundation\interface\IEnum;
 
 enum MenuOpenType:int implements IEnum
 {
@@ -22,7 +23,6 @@ enum MenuOpenType:int implements IEnum
     case COMPONENT = 1;     // 组件
     case INTERNAL_LINK = 2; // 内链
     case EXTERNAL_LINK = 3; // 外链
-
 
     public function label(): string
     {

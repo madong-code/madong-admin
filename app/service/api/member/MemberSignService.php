@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -18,9 +19,8 @@ use app\dao\member\MemberSignDao;
 use app\service\api\member\MemberPointsService;
 use app\model\member\MemberSign;
 use app\enum\member\PointSource;
-use core\base\BaseService;
-use core\exception\handler\BadRequestHttpException;
-use core\exception\handler\UnauthorizedHttpException;
+use core\foundation\base\BaseService;
+use core\foundation\exception\handler\BadRequestHttpException;
 
 /**
  * 会员签到服务
@@ -45,13 +45,14 @@ class MemberSignService extends BaseService
      */
     public function sign(int|string $memberId, array $deviceInfo = []): array
     {
-        return $this->transaction(function () use ($memberId, $deviceInfo) {
-            $today = date('Y-m-d');
+        $today = date('Y-m-d');
 
-            // 检查今日是否已签到
-            if ($this->memberSignDao->isSignedToday($memberId, $today)) {
-                throw new BadRequestHttpException('今日已签到');
-            }
+        // 检查今日是否已签到
+        if ($this->memberSignDao->isSignedToday($memberId, $today)) {
+            throw new BadRequestHttpException('今日已签到');
+        }
+
+        return $this->transaction(function () use ($memberId, $deviceInfo, $today) {
 
             // 获取最近一次签到记录
             $lastSign = $this->memberSignDao->getLastSign($memberId);
@@ -108,7 +109,7 @@ class MemberSignService extends BaseService
     /**
      * 获取签到日历
      */
-    public function getCalendar(int|string $memberId, int $year = null, int $month = null): array
+    public function getCalendar(int|string $memberId, ?int $year = null, ?int $month = null): array
     {
         $year  = $year ?? (int)date('Y');
         $month = $month ?? (int)date('m');
@@ -200,5 +201,75 @@ class MemberSignService extends BaseService
     public function getMonthSignDays(int|string $memberId): int
     {
         return $this->memberSignDao->getMonthSignDays($memberId);
+    }
+
+    /**
+     * 每月最大补签次数
+     */
+    private const MAX_RESIGN_PER_MONTH = 3;
+
+    /**
+     * 补签：补签指定日期
+     *
+     * @throws \Exception
+     * @throws \Throwable
+     */
+    public function reSign(int|string $memberId, string $signDate): array
+    {
+        $today = date('Y-m-d');
+
+        // 校验日期合法性
+        if ($signDate >= $today) {
+            throw new BadRequestHttpException('只能补签今天之前的日期');
+        }
+
+        // 必须是本月
+        $signMonth = substr($signDate, 0, 7);
+        $thisMonth = date('Y-m');
+        if ($signMonth !== $thisMonth) {
+            throw new BadRequestHttpException('只能补签本月内的日期');
+        }
+
+        // 检查是否已签到
+        if ($this->memberSignDao->isSignedToday($memberId, $signDate)) {
+            throw new BadRequestHttpException('该日期已签到，无需重复补签');
+        }
+
+        // 检查本月补签次数上限
+        $monthReSignCount = $this->memberSignDao->getMonthReSignCount($memberId);
+        if ($monthReSignCount >= self::MAX_RESIGN_PER_MONTH) {
+            throw new BadRequestHttpException('本月补签次数已用完（每月最多' . self::MAX_RESIGN_PER_MONTH . '次）');
+        }
+
+        // 补签日期必须与已签到日期相邻
+        if (!$this->memberSignDao->hasAdjacentSign($memberId, $signDate)) {
+            throw new BadRequestHttpException('补签日期必须与已签到日期相邻');
+        }
+
+        return $this->transaction(function () use ($memberId, $signDate) {
+            $signRecord = $this->memberSignDao->reSign(
+                $memberId,
+                $signDate,
+                0,
+                0
+            );
+
+            // 重新计算连续签到天数并更新记录
+            $continuousDays = $this->memberSignDao->recalcContinuousDays($memberId);
+
+            // 更新补签记录的积分和连续天数
+            $signRecord->continuous_days = $continuousDays;
+            $signRecord->save();
+
+            // 增加积分
+            $points = $this->memberPointsService->getSignPoints((int)$memberId, $continuousDays);
+
+            return [
+                'points'          => $points,
+                'continuous_days' => $continuousDays,
+                'sign_date'       => $signDate,
+                'sign_record'     => $signRecord,
+            ];
+        });
     }
 }

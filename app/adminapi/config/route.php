@@ -1,9 +1,10 @@
 <?php
+declare(strict_types=1);
+
 /**
  * This file is part of webman.
  * Licensed under The MIT License
  * For full copyright and license information, please see the MIT-LICENSE.txt
- * Redistributions of files must retain the above copyright notice.
  *
  * @author    walkor<walkor@workerman.net>
  * @copyright walkor<walkor@workerman.net>
@@ -14,20 +15,19 @@
 use Webman\Route;
 use WebmanTech\Swagger\Swagger;
 use OpenApi\Annotations as OA;
-use app\adminapi\controller\terminal\TerminalSseController;
-
 /**
  * 注册admin APP路由
  */
 Route::group('/adminapi', function () {
+    // Swagger 注解路由注册（自动扫描）
     Swagger::create()->registerRoute([
         'route_prefix'   => '/openapi',
         'register_route' => true,
         'openapi_doc'    => [
             'scan_path' => [
                 base_path('app/schema'),//基础schema
-                base_path('app/adminapi'),
-                base_path('app/install'),
+                base_path('app/adminapi'),//后端接口
+                base_path('app/install'),//安装接口
             ],
             'modify'    => function (OA\OpenApi $openapi) {
                 $openapi->info->title   = config('app.name') . ' API';
@@ -48,13 +48,11 @@ Route::group('/adminapi', function () {
                     new OA\SecurityScheme([
                         'securityScheme' => 'api_key',
                         'type'           => 'apiKey',
-                        'name'           => config('madong.jwt.app.token_name', 'Authorization'),
+                        'name'           => config('core.security.jwt.token_name', 'Authorization'),
                         'in'             => 'header',
                     ]),
                 ];
             },
-
         ],
     ]);
-
 });

@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -13,7 +14,7 @@ declare(strict_types=1);
 
 namespace app\service\core\lang;
 
-use core\base\BaseService;
+use core\foundation\base\BaseService;
 
 /**
  * 翻译服务类

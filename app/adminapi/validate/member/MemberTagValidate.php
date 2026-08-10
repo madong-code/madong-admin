@@ -1,10 +1,20 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\adminapi\validate\member;
 
 use app\model\member\MemberTag;
-use core\base\BaseValidate;
+use core\foundation\base\BaseValidate;
 use Illuminate\Validation\Rule;
 
 /**
@@ -28,7 +38,7 @@ class MemberTagValidate extends BaseValidate
     /**
      * 验证消息
      */
-    protected array $message = [
+    protected array $messages = [
         'name.required' => '标签名称不能为空',
         'name.max'     => '标签名称不能超过50个字符',
         'name.unique'  => '标签名称已存在',
@@ -41,7 +51,7 @@ class MemberTagValidate extends BaseValidate
     /**
      * 验证场景
      */
-    protected array $scene = [
+    protected array $scenes = [
         'store'  => ['name', 'color', 'sort', 'status'],
         'update' => ['name', 'color', 'sort', 'status'],
     ];

@@ -20,19 +20,21 @@ use app\adminapi\middleware\OperationMiddleware;
 use app\adminapi\middleware\PermissionMiddleware;
 use app\adminapi\validate\plugin\PluginValidate;
 use app\service\admin\plugin\PluginDevelopService;
+use core\foundation\exception\handler\AdminException;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\DataResponse;
 use madong\swagger\annotation\response\PageResponse;
 use madong\swagger\annotation\response\SimpleResponse;
+use support\Response;
 use madong\swagger\attribute\Permission;
-use core\tool\Json;
 use OpenApi\Attributes as OA;
 use support\annotation\Middleware;
 use support\Request;
 
+#[OA\Tag(name: '插件开发', description: '应用管理-插件开发')]
 #[Middleware(AccessTokenMiddleware::class, PermissionMiddleware::class, OperationMiddleware::class)]
 final class PluginDevelopController extends Crud
 {
-
     public function __construct(PluginDevelopService $service, PluginValidate $validate)
     {
         $this->service  = $service;
@@ -40,130 +42,58 @@ final class PluginDevelopController extends Crud
     }
 
     /**
-     * 插件列表
-     * 扫描插件目录，获取type为madong:前缀的插件，同步到数据库并返回列表
-     *
-     * @param Request $request
-     *
-     * @return \support\Response
+     * 插件列表（扫描插件目录并同步到数据库）
      */
     #[OA\Get(
         path: '/plugin/develop',
-        summary: '插件列表',
+        summary: '列表',
         tags: ['插件开发'],
         parameters: [
-            new OA\Parameter(
-                name: 'page',
-                description: '页码',
-                in: 'query',
-                required: false,
-                schema: new OA\Schema(type: 'integer', default: 1)
-            ),
-            new OA\Parameter(
-                name: 'limit',
-                description: '每页数量',
-                in: 'query',
-                required: false,
-                schema: new OA\Schema(type: 'integer', default: 15)
-            ),
-            new OA\Parameter(
-                name: 'title',
-                description: '插件标题',
-                in: 'query',
-                required: false,
-                schema: new OA\Schema(type: 'string')
-            ),
-            new OA\Parameter(
-                name: 'author',
-                description: '作者',
-                in: 'query',
-                required: false,
-                schema: new OA\Schema(type: 'string')
-            ),
-            new OA\Parameter(
-                name: 'status',
-                description: '状态',
-                in: 'query',
-                required: false,
-                schema: new OA\Schema(type: 'integer')
-            ),
+            new OA\Parameter(name: 'page', description: '页码', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'limit', description: '每页数量', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'keyword', description: '搜索关键词', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'LIKE_title', description: '插件名称', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'LIKE_desc', description: '插件描述', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'EQ_status', description: '状态', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
         ]
     )]
-    #[Permission(code: 'plugin:develop:list')]
-    #[PageResponse(schema: [], example: [[
-                                             "id"           => "2032735331152958596",
-                                             "name"        => "官网管理",
-                                             "icon"         => null,
-                                             "code"          => "official",
-                                             "description"         => "官网管理插件，用于搭建和管理企业官方网站",
-                                             "enabled"       => 1,
-                                             "author"       => "Mr.April",
-                                             "version"      => "1.0.0",
-                                             "cover"        => null,
-                                             "type"         => "madong:plugin",
-                                             "support_app"  => "admin",
-                                             "installed_at" => null,
-                                             "created_at"   => 1773476844,
-                                             "updated_at"   => 1773476844,
-                                             "variables"    => null,
-                                             "created_date" => "2026-03-14 16:27:24",
-                                             "updated_date" => "2026-03-14 16:27:24",
-                                         ]])]
+    #[Permission('plugin:develop:list')]
+    #[PageResponse(example: '{"code": 0,"msg": "ok","data": {"list": [],"total": 0}}')]
     public function index(Request $request): \support\Response
     {
         try {
-            // 使用标准模式：通过 selectInput 处理查询参数
+            // 解析查询参数
             [$where, , $limit, , , $page] = $this->selectInput($request);
-
-            // 调用服务层获取列表数据
             $result = $this->service->getList($where, $page, $limit);
-
-            // 使用标准格式返回
+            // 统一响应字段名: list → items
+            if (isset($result['list'])) {
+                $result['items'] = $result['list'];
+                unset($result['list']);
+            }
             return Json::success($result);
         } catch (\Exception $e) {
             return Json::fail($e->getMessage());
         }
     }
 
+    /**
+     * 获取插件详情
+     */
     #[OA\Get(
         path: '/plugin/develop/{id}',
-        summary: '插件详情',
+        summary: '详情',
         tags: ['插件开发'],
         parameters: [
-            new OA\Parameter(
-                name: 'id',
-                description: '插件ID',
-                in: 'path',
-                required: true,
-                schema: new OA\Schema(type: 'integer')
-            ),
+            new OA\Parameter(name: 'id', description: '插件ID', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
         ]
     )]
-    #[Permission(code: 'plugin:develop:read')]
-    #[DataResponse(schema: [], example: [
-        "id"           => "2032735331152958596",
-        "title"        => "官网管理",
-        "icon"         => null,
-        "key"          => "official",
-        "desc"         => "官网管理插件，用于搭建和管理企业官方网站",
-        "status"       => 1,
-        "author"       => "Mr.April",
-        "version"      => "1.0.0",
-        "cover"        => null,
-        "type"         => "madong:plugin",
-        "support_app"  => "admin",
-        "installed_at" => null,
-        "created_at"   => 1773476844,
-        "updated_at"   => 1773476844,
-        "variables"    => null,
-        "created_date" => "2026-03-14 16:27:24",
-        "updated_date" => "2026-03-14 16:27:24",
-    ])]
+    #[Permission('plugin:develop:read')]
+    #[DataResponse(example: '{"code": 0,"msg": "ok","data": {}}')]
     public function show(Request $request): \support\Response
     {
         try {
             $id     = $request->route->param('id');
-            $plugin = $this->service->read($id);
+            $plugin = $this->service->show($id);
             if (!$plugin) {
                 return Json::fail('插件不存在');
             }
@@ -175,126 +105,156 @@ final class PluginDevelopController extends Crud
 
     /**
      * 创建插件
-     *
-     * @param Request $request
-     *
-     * @return \support\Response
-     * @throws \Throwable
      */
     #[OA\Post(
         path: '/plugin/develop',
-        summary: '创建插件',
+        summary: '创建',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                required: ['title', 'key'],
-                properties: [
-                    new OA\Property(property: 'title', description: '插件标题', type: 'string'),
-                    new OA\Property(property: 'key', description: '插件标识（唯一值）', type: 'string'),
-                    new OA\Property(property: 'desc', description: '插件描述', type: 'string'),
-                    new OA\Property(property: 'author', description: '作者', type: 'string'),
-                    new OA\Property(property: 'version', description: '版本', type: 'string', default: '1.0.0'),
-                    new OA\Property(property: 'type', description: '类型', type: 'string', default: 'madong:plugin'),
-                    new OA\Property(property: 'icon', description: '图标（base64）', type: 'string'),
-                    new OA\Property(property: 'cover', description: '封面（base64）', type: 'string'),
-                    new OA\Property(property: 'frontend_type', description: '前端类型', type: 'string', default: 'admin'),
-                ]
+            content: new OA\MediaType(
+                mediaType: 'multipart/form-data',
+                schema: new OA\Schema(
+                    properties: [
+                        new OA\Property(property: 'title', description: '插件名称', type: 'string'),
+                        new OA\Property(property: 'key', description: '插件标识', type: 'string'),
+                        new OA\Property(property: 'desc', description: '描述', type: 'string'),
+                        new OA\Property(property: 'version', description: '版本号', type: 'string'),
+                        new OA\Property(property: 'author', description: '作者', type: 'string'),
+                        new OA\Property(property: 'type', description: '类型', type: 'string'),
+                        new OA\Property(property: 'icon', description: '图标(base64)', type: 'string'),
+                        new OA\Property(property: 'cover', description: '封面(base64)', type: 'string'),
+                    ]
+                )
             )
         ),
         tags: ['插件开发']
     )]
-    #[Permission(code: 'plugin:develop:create')]
-    #[SimpleResponse(schema: [], example: [])]
+    #[Permission('plugin:develop:create')]
+    #[SimpleResponse(example: '{"code": 0,"msg": "ok","data": []}')]
     public function store(Request $request): \support\Response
     {
         try {
-            $this->validate->scene('store')->check($request->all());
-            $this->service->store($request->all());
-            return Json::success();
+            $data = $request->all();
+            $this->validate->scene('store')->check($data);
+            $result = $this->service->store($data);
+            return Json::success('ok', $result);
         } catch (\Exception $e) {
             return Json::fail($e->getMessage());
         }
     }
 
     /**
-     * 打包插件
-     * 将后端、后台前端、前台前端复制到后端server/plugin/xxx/resource目录，并打包为zip
-     *
-     * @param Request $request
-     *
-     * @return \support\Response
+     * 编辑插件
      */
-    #[OA\Post(
-        path: '/plugin/develop/build',
-        summary: '打包插件',
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(
-                required: ['plugin_key'],
-                properties: [
-                    new OA\Property(property: 'plugin_key', description: '插件标识', type: 'string'),
-                ]
-            )
-        ),
-        tags: ['插件开发']
-    )]
-    #[Permission(code: 'plugin:develop:build')]
-    #[SimpleResponse(schema: [], example: [
-        "plugin_key"   => "test",
-        "zip_path"     => "D:\\MyProject\\private\\madong/server/runtime/adminapi/test.zip",
-        "has_frontend" => false,
-    ])]
-    public function build(Request $request): \support\Response
-    {
-        try {
-            $pluginKey = $request->input('plugin_key');
-            if (empty($pluginKey)) {
-                return Json::fail('插件标识不能为空');
-            }
-
-            $result = $this->service->buildPlugin($pluginKey);
-            return Json::success('插件打包成功',$result);
-        } catch (\Exception $e) {
-            return Json::fail($e->getMessage());
-        }
-    }
-
     #[OA\Put(
         path: '/plugin/develop/{id}',
-        summary: '编辑插件',
+        summary: '编辑',
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(
-                properties: [
-                    new OA\Property(property: 'title', description: '插件标题', type: 'string'),
-                    new OA\Property(property: 'desc', description: '插件描述', type: 'string'),
-                    new OA\Property(property: 'author', description: '作者', type: 'string'),
-                    new OA\Property(property: 'version', description: '版本', type: 'string'),
-                    new OA\Property(property: 'icon', description: '图标（base64）', type: 'string'),
-                    new OA\Property(property: 'cover', description: '封面（base64）', type: 'string'),
-                ]
+            content: new OA\MediaType(
+                mediaType: 'multipart/form-data',
+                schema: new OA\Schema(
+                    properties: [
+                        new OA\Property(property: 'title', description: '插件名称', type: 'string'),
+                        new OA\Property(property: 'desc', description: '描述', type: 'string'),
+                        new OA\Property(property: 'version', description: '版本号', type: 'string'),
+                        new OA\Property(property: 'author', description: '作者', type: 'string'),
+                        new OA\Property(property: 'icon', description: '图标(base64)', type: 'string'),
+                        new OA\Property(property: 'cover', description: '封面(base64)', type: 'string'),
+                    ]
+                )
             )
         ),
         tags: ['插件开发'],
         parameters: [
-            new OA\Parameter(
-                name: 'id',
-                description: '插件ID',
-                in: 'path',
-                required: true,
-                schema: new OA\Schema(type: 'integer')
-            ),
+            new OA\Parameter(name: 'id', description: '插件ID', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
         ]
     )]
-    #[Permission(code: 'plugin:develop:update')]
-    #[SimpleResponse(schema: [], example: [])]
+    #[Permission('plugin:develop:update')]
+    #[SimpleResponse(example: '{"code": 0,"msg": "更新成功"}')]
     public function update(Request $request): \support\Response
     {
         try {
-            $id = $request->route->param('id');
-            $this->service->update($id, $request->all());
-            return Json::success('更新成功');
+            $id   = $request->route->param('id');
+            $data = $request->all();
+            $this->validate->scene('update')->check($data);
+            $result = $this->service->update($id, $data);
+            return Json::success('更新成功', $result);
         } catch (\Throwable $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    /**
+     * 删除插件
+     */
+    #[OA\Delete(
+        path: '/plugin/develop/{id}',
+        summary: '删除',
+        tags: ['插件开发'],
+        parameters: [
+            new OA\Parameter(name: 'id', description: '插件ID（支持逗号分隔批量删除）', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ]
+    )]
+    #[Permission('plugin:develop:delete')]
+    #[SimpleResponse(example: '{"code": 0,"msg": "删除成功"}')]
+    public function destroy(Request $request): Response
+    {
+        try {
+            $ids = $this->getDeleteIds($request);
+            if (empty($ids)) {
+                throw new AdminException('删除参数不能为空');
+            }
+            $result = $this->service->transaction(function () use ($ids) {
+                $ids        = is_array($ids) ? $ids : explode(',', $ids);
+                $deletedIds = [];
+                foreach ($ids as $id) {
+                    $this->service->destroyPlugin($id);
+                    $deletedIds[] = $id;
+                }
+                return $deletedIds;
+            });
+            return Json::success('删除成功', $result);
+        } catch (\Throwable $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    #[OA\Delete(
+        path: '/plugin/develop',
+        summary: '批量删除',
+        tags: ['插件开发'],
+        parameters: [
+            new OA\Parameter(name: 'id', description: '插件ID（支持逗号分隔批量删除）', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ]
+    )]
+    #[Permission('plugin:develop:delete')]
+    #[SimpleResponse(example: '{"code": 0,"msg": "删除成功"}')]
+    public function batchDestroy(Request $request): Response
+    {
+        return $this->destroy($request);
+    }
+
+    /**
+     * 打包插件
+     */
+    #[OA\Post(
+        path: '/plugin/develop/{id}/build',
+        summary: '打包',
+        tags: ['插件开发'],
+        parameters: [
+            new OA\Parameter(name: 'id', description: '插件ID', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ]
+    )]
+    #[Permission('plugin:develop:build')]
+    #[SimpleResponse(example: '{"code": 0,"msg": "打包成功","data": {"file": ""}}')]
+    public function build(Request $request): \support\Response
+    {
+        try {
+            $id     = $request->route->param('id');
+            $result = $this->service->buildPlugin($id);
+            return Json::success('打包成功', $result);
+        } catch (\Exception $e) {
             return Json::fail($e->getMessage());
         }
     }

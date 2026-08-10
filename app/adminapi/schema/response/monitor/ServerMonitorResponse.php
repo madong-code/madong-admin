@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -12,7 +13,6 @@ declare(strict_types=1);
  */
 
 namespace app\adminapi\schema\response\monitor;
-
 
 use madong\swagger\schema\BaseResponseDTO;
 use OpenApi\Attributes as OA;

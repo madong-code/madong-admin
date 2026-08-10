@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace DummyNamespace;
 
-use core\base\BaseValidate;
+use core\foundation\base\BaseValidate;
 
 /**
  * DummyClass验证器
@@ -36,7 +36,7 @@ class DummyClass extends BaseValidate
     /**
      * 定义错误信息
      */
-    protected array \$message = [
+    protected array \$messages = [
         // 示例错误信息
         // 'name.require' => '名称必须填写',
         // 'name.max' => '名称最多50个字符',
@@ -47,7 +47,7 @@ class DummyClass extends BaseValidate
     /**
      * 定义场景
      */
-    protected array \$scene = [
+    protected array \$scenes = [
         'store' => [
             // 创建时验证的字段
         ],

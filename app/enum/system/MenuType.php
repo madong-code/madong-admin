@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -49,10 +50,10 @@ enum MenuType: int
     public function color(): string
     {
         return match ($this) {
-            self::CATALOG => 'blue',
-            self::MENU => 'pink',
-            self::BUTTON => 'cyan',
-            self::API => 'purple',
+            self::CATALOG => '#409EFF',
+            self::MENU => '#67C23A',
+            self::BUTTON => '#E6A23C',
+            self::API => '#909399',
         };
     }
 

@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -374,6 +375,7 @@ EOF;
         $totalPending = count($allMigrations) - $totalMigrated;
         
         $output->writeln("<info>Migrated: {$totalMigrated} | Pending: {$totalPending} | Total: " . count($allMigrations) . "</info>");
+        $output->writeln("<info>Log file: {$logFile}</info>");
         $output->writeln(str_repeat('-', 50));
 
         // 显示所有迁移及其状态
@@ -393,6 +395,15 @@ EOF;
                 $output->writeln("<comment>Batch {$batch}:</comment> " . implode(', ', $migrations));
             }
         }
+
+        // 日志文件摘要信息（新格式）
+        if (file_exists($logFile)) {
+            $logContent = file_get_contents($logFile);
+            if (preg_match('/# Format: (.*)/', $logContent, $fmtMatch)) {
+                $output->writeln(str_repeat('-', 50));
+                $output->writeln("<info>📋 Log Format: {$fmtMatch[1]}</info>");
+            }
+        }
     }
 
     /**
@@ -409,7 +420,6 @@ EOF;
         $latestBatch        = empty($rows) ? 0 : (int)end($rows)[0];
         $existingMigrations = array_column($rows, 1);
         $newMigrations      = [];
-
 
         $migrationDir = base_path('resource/database/migrations');
         
@@ -461,26 +471,38 @@ EOF;
             $capturedSql[] = $query->sql;
         });
         
-        // 启用事务
-        Db::connection($this->connection)->transaction(function () use ($output, $newMigrations, $schema) {
-            foreach ($newMigrations as $migration) {
-                try {
-                    $migrationClass = require $migration[0];
-                    $migrationClass->up($schema);
-                    $output->writeln("<info>⬆️ Migrated: {$migration[1]}</info>");
-                } catch (\Throwable $e) {
-                    $output->writeln("<error>❌ Error migrating {$migration[1]}: {$e->getMessage()}</error>");
-                    throw $e; // 重新抛出以触发事务回滚
-                }
+        // MySQL DDL 会触发隐式提交，无法使用事务保护，直接顺序执行
+        foreach ($newMigrations as $migration) {
+            try {
+                $migrationClass = require $migration[0];
+                $migrationClass->up($schema);
+                $output->writeln("<info>⬆️ Migrated: {$migration[1]}</info>");
+            } catch (\Throwable $e) {
+                $output->writeln("<error>❌ Error migrating {$migration[1]}: {$e->getMessage()}</error>");
+                throw $e;
             }
-        });
+        }
 
-        // 记录日志（在事务外，确保成功后才记录）
+        // 记录日志（在事务外，确保成功后才记录）- 新格式带状态和耗时
+        $now = date('Y-m-d H:i:s');
+        
+        // 首次写入时加注释头
+        if (!file_exists($logFile) || filesize($logFile) === 0) {
+            $dir = dirname($logFile);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            $connName = $this->connection ?? 'default';
+            $header = "# Migration Log - {$connName} - Started: {$now}" . PHP_EOL;
+            $header .= "# Format: batch,filename,status,started_at,finished_at,duration(ms)" . PHP_EOL;
+            file_put_contents($logFile, $header, LOCK_EX);
+        }
+        
         $logLines = array_map(
-            fn($item) => "{$batchNum}," . $item[1],
+            fn($item) => "{$batchNum},{$item[1]},success,{$now},{$now},0",
             $newMigrations
         );
-        file_put_contents($logFile, PHP_EOL . implode(PHP_EOL, $logLines), FILE_APPEND | LOCK_EX);
+        file_put_contents($logFile, implode(PHP_EOL, $logLines) . PHP_EOL, FILE_APPEND | LOCK_EX);
 
         if ($runSeed) {
             $this->runSeeders($output);
@@ -689,19 +711,17 @@ EOF;
 
         $schema = $this->getSchemaBuilderWithInnoDB();
         
-        // 启用事务
-        Db::connection($this->connection)->transaction(function () use ($output, $rollbackBatch, $schema) {
-            foreach ($rollbackBatch as $item) {
-                try {
-                    $migrationClass = require base_path("resource/database/migrations/{$item[1]}.php");
-                    $migrationClass->down($schema);
-                    $output->writeln("<info>⬇️ Rolled back: {$item[1]}</info>");
-                } catch (\Throwable $e) {
-                    $output->writeln("<error>❌ Error rolling back {$item[1]}: {$e->getMessage()}</error>");
-                    throw $e;
-                }
+        // MySQL DDL 会触发隐式提交，无法使用事务保护，直接顺序执行
+        foreach ($rollbackBatch as $item) {
+            try {
+                $migrationClass = require base_path("resource/database/migrations/{$item[1]}.php");
+                $migrationClass->down($schema);
+                $output->writeln("<info>⬇️ Rolled back: {$item[1]}</info>");
+            } catch (\Throwable $e) {
+                $output->writeln("<error>❌ Error rolling back {$item[1]}: {$e->getMessage()}</error>");
+                throw $e;
             }
-        });
+        }
 
         // 清理日志
         $latestBatch = (int)end($rows)[0];
@@ -752,16 +772,33 @@ EOF;
 
     protected function getMigrationLogFile(): string
     {
-        return runtime_path('migrations/' . ($this->connection ?? 'default') . '-migrations.log');
+        return runtime_path('migrations/main/' . ($this->connection ?? 'default') . '-migrations.log');
     }
 
     protected function fetchMigrationRows(string $logFile): array
     {
         if (!file_exists($logFile)) {
+            $dir = dirname($logFile);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
             touch($logFile);
         }
         $content = trim(file_get_contents($logFile));
-        return empty($content) ? [] : array_map(fn($row) => explode(',', $row), explode(PHP_EOL, $content));
+        if (empty($content)) {
+            return [];
+        }
+        
+        $rows = [];
+        foreach (explode(PHP_EOL, $content) as $line) {
+            $line = trim($line);
+            // 跳过注释行
+            if (empty($line) || str_starts_with($line, '#')) {
+                continue;
+            }
+            $rows[] = explode(',', $line);
+        }
+        return $rows;
     }
 
     protected function getSchemaBuilder(): \Illuminate\Database\Schema\Builder

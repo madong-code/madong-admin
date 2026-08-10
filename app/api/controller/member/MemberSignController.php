@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -17,8 +18,9 @@ use app\api\controller\Base;
 use app\api\CurrentMember;
 use app\api\middleware\ApiAccessTokenMiddleware;
 use app\service\api\member\MemberSignService;
-use core\exception\handler\UnauthorizedHttpException;
-use core\tool\Json;
+use core\foundation\exception\handler\BadRequestHttpException;
+use core\foundation\exception\handler\UnauthorizedHttpException;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
 use OpenApi\Attributes as OA;
@@ -73,11 +75,6 @@ final class MemberSignController extends Base
                 'continuous_days' => $result['continuous_days'],
                 'sign_date'       => $result['sign_date'],
             ]);
-
-        } catch (UnauthorizedHttpException $e) {
-            return Json::fail($e->getMessage(), null, 401);
-        } catch (\Exception $e) {
-            return Json::fail($e->getMessage(), null, 400);
         } catch (\Throwable $e) {
             return Json::fail($e->getMessage());
         }
@@ -190,6 +187,55 @@ final class MemberSignController extends Base
 
         } catch (UnauthorizedHttpException $e) {
             return Json::fail($e->getMessage(), null, 401);
+        } catch (\Throwable $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    #[OA\Post(
+        path: '/member/sign/resign',
+        summary: '补签',
+        tags: ['会员签到'],
+        parameters: [
+            new OA\Parameter(name: 'sign_date', description: '补签日期 (Y-m-d)', in: 'query', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: '补签成功'),
+            new OA\Response(response: 401, description: '未登录'),
+            new OA\Response(response: 400, description: '补签失败'),
+        ]
+    )]
+    #[SimpleResponse(schema: [], example: [])]
+    #[AllowAnonymous(requireToken: false, requirePermission: false, description: '公共接口')]
+    public function resign(Request $request): Response
+    {
+        try {
+            /** @var CurrentMember $currentMember */
+            $currentMember = Container::make(CurrentMember::class);
+            $member        = $currentMember->user(true);
+            if (empty($member)) {
+                throw new UnauthorizedHttpException('用户凭证失效请重新登录');
+            }
+
+            $memberId = $member['id'];
+            $signDate = $request->input('sign_date', '');
+
+            if (empty($signDate)) {
+                throw new BadRequestHttpException('补签日期不能为空');
+            }
+
+            // 校验日期格式
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $signDate)) {
+                throw new BadRequestHttpException('日期格式不正确，请使用 Y-m-d 格式');
+            }
+
+            $result = $this->service->reSign($memberId, $signDate);
+
+            return Json::success('补签成功', [
+                'points'          => $result['points'],
+                'continuous_days' => $result['continuous_days'],
+                'sign_date'       => $result['sign_date'],
+            ]);
         } catch (\Throwable $e) {
             return Json::fail($e->getMessage());
         }

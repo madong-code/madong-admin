@@ -1,11 +1,19 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\model\member;
 
-
-
-use core\base\BaseModel;
+use core\foundation\base\BaseModel;
 
 /**
  * 会员积分模型
@@ -44,12 +52,14 @@ class MemberPoints extends BaseModel
     {
 
     }
-
     protected $casts = [
-        'points' => 'integer',
-        'balance' => 'integer',
+        'balance'      => 'integer',
+        'id'           => 'string',
+        'member_id'    => 'string',
+        'order_id'     => 'string',
+        'points'       => 'integer',
         'points_after' => 'integer',
-        'type' => 'integer',
+        'type'         => 'integer',
     ];
 
     /**

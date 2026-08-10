@@ -1,26 +1,15 @@
-import { AppRouteRecord } from '@/types/router'
-import { RoutesAlias } from '@/router/routesAlias'
+import { $t } from '#/locales';
 
-export default {
-  path: '/{{pluginName}}',
-  name: '{{camelPluginName}}',
-  component: RoutesAlias.Layout,
-  meta: {
-    title: '{{pluginTitle}}',
-    icon: 'ri:plugin-line',
-    module: '{{pluginName}}'
+export default [
+  {
+    path: '/{{pluginKey}}/index',
+    name: '{{camelPluginName}}Index',
+    component: 'test/index',
+    meta: {
+      title: $t('{{pluginKey}}.test.title'),
+      icon: 'lucide:plugin',
+      order: 1,
+      module: '{{pluginKey}}',
+    },
   },
-  children: [
-    {
-      path: 'index',
-      name: '{{camelPluginName}}Index',
-      component: '/index/index',
-      meta: {
-        title: '首页',
-        icon: 'ri:home-line',
-        keepAlive: false,
-        module: '{{pluginName}}'
-      }
-    }
-  ]
-} as AppRouteRecord
+];

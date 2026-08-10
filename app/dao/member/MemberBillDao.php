@@ -1,9 +1,19 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\dao\member;
 
-use core\base\BaseDao;
+use core\foundation\base\BaseDao;
 use app\model\member\MemberBill;
 use app\enum\member\BillType;
 use app\enum\member\BillStatus;
@@ -70,12 +80,23 @@ class MemberBillDao extends BaseDao
         }
 
         // 分页参数
-        $page = $params['page'] ?? 1;
-        $limit = $params['limit'] ?? 10;
+        $page  = intval($params['page'] ?? 1);
+        $limit = intval($params['limit'] ?? 10);
+        $offset = ($page - 1) * $limit;
 
-        return $query->orderBy('created_at', 'desc')
-            ->paginate($limit, ['*'], 'page', $page)
+        $total = $query->count();
+        $items = $query->orderBy('created_at', 'desc')
+            ->offset($offset)
+            ->limit($limit)
+            ->get()
             ->toArray();
+
+        return [
+            'items' => $items,
+            'total' => $total,
+            'page'  => $page,
+            'limit' => $limit,
+        ];
     }
 
     /**
@@ -159,7 +180,7 @@ class MemberBillDao extends BaseDao
     /**
      * 获取账单总数
      */
-    public function getCount(int $memberId, array $params = []): int
+    public function getMemberBillCount(int $memberId, array $params = []): int
     {
         $query = $this->query()->where('member_id', $memberId);
 

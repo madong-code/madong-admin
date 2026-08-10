@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -139,14 +140,17 @@ class MorphMapBootstrap implements Bootstrap
 
         $config = include $configFile;
 
-        // 支持两种配置格式：
-        // 格式1：直接返回映射数组 ['question' => 'plugin\...\Question']
-        // 格式2：返回包含 morph_map 键的配置数组 ['morph_map' => ['question' => ...]]
+        // 支持三种配置格式（与主项目 config/morph_map.php 对齐）：
+        // 格式1：['map' => ['question' => 'plugin\...\Question']]  （推荐，与主配置一致）
+        // 格式2：['morph_map' => ['question' => ...]]
+        // 格式3：直接返回映射数组 ['question' => 'plugin\...\Question']
         if (is_array($config)) {
-            if (isset($config['morph_map']) && is_array($config['morph_map'])) {
+            if (isset($config['map']) && is_array($config['map'])) {
+                $morphMap = $config['map'];
+            } elseif (isset($config['morph_map']) && is_array($config['morph_map'])) {
                 $morphMap = $config['morph_map'];
             } else {
-                // 如果配置文件本身就是映射数组
+                // 配置文件本身就是 alias => class 映射
                 $morphMap = $config;
             }
         }

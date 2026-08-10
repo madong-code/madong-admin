@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -9,8 +11,9 @@
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 namespace app\enum\plugin;
+
+use core\business\plugin\PluginPath;
 
 enum FrontendType: string
 {
@@ -27,11 +30,11 @@ enum FrontendType: string
     public function pathTemplate(): string
     {
         return match($this) {
-            self::WEB => 'frontend/web/app/apps/%s',
-            self::ADMIN => 'frontend/admin/src/apps/%s',
-            self::MOBILE => 'frontend/mobile/src/apps/%s',
-            self::H5 => 'frontend/h5/public/apps/%s',
-            self::DESKTOP => 'frontend/desktop/build/apps/%s',
+            self::WEB => 'template/web/src/plugin/%s',
+            self::ADMIN => 'template/admin/src/plugin/%s',
+            self::MOBILE => 'template/mobile/src/apps/%s',
+            self::H5 => 'template/h5/public/apps/%s',
+            self::DESKTOP => 'template/desktop/build/apps/%s',
         };
     }
 

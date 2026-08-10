@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -9,7 +11,6 @@
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 namespace app\service\core\plugin;
 
 use app\enum\plugin\FrontendType;
@@ -26,17 +27,32 @@ class PluginDevelopService extends PluginBaseService
      * 模板文件路径映射
      */
     private const STUB_PATHS = [
-        'api'            => '/stubs/admin/api/index.stub',
-        'view'           => '/stubs/admin/views/index.stub',
-        'routes'         => '/stubs/admin/routes/index.stub',
-        'config'         => '/stubs/server/config.stub',
-        'controller'     => '/stubs/server/controller.stub',
-        'install'        => '/stubs/server/install.stub',
-        'config_info'    => '/stubs/server/config-info.stub',
-        'route'          => '/stubs/server/route.stub',
-        'menu_admin'     => '/stubs/server/menu-admin.stub',
-        'menu_frontend'  => '/stubs/server/menu-frontend.stub',
-        'menu_web'       => '/stubs/server/menu-web.stub',
+        'api'               => '/stubs/admin/api/index.stub',
+        'view'              => '/stubs/admin/views/index.stub',
+        'routes'            => '/stubs/admin/routes/index.stub',
+        'config'            => '/stubs/server/config.stub',
+        'controller'        => '/stubs/server/controller.stub',
+        'install'           => '/stubs/server/install.stub',
+        'config_info'       => '/stubs/server/config-info.stub',
+        'route'             => '/stubs/server/route.stub',
+        'menu_admin'        => '/stubs/server/menu-admin.stub',
+        'menu_web'          => '/stubs/server/menu-web.stub',
+        // 默认模版文件
+        'gitignore'         => '/stubs/server/.gitignore.stub',
+        'installed'         => '/stubs/server/installed.stub',
+        'review'            => '/stubs/server/review.stub',
+        'translation'       => '/stubs/server/translation.stub',
+        // API 相关模板
+        'api_types'         => '/stubs/admin/api/types.stub',
+        'view_schema'       => '/stubs/admin/views/schema/index.stub',
+        // Mock / Route 模板
+        'mock_api'          => '/stubs/admin/mock/api.stub',
+        'mock_table_data'   => '/stubs/admin/mock/table-data.stub',
+        // 语言包模板（en-US / zh-CN）
+        'lang_zh_cn'        => '/stubs/admin/lang/zh-CN/index.stub',
+        'lang_en_us'        => '/stubs/admin/lang/en-US/index.stub',
+        // Web 端模板
+        'web_pages_routes'  => '/stubs/web/pages/routes.stub',
     ];
 
     /**
@@ -91,11 +107,11 @@ class PluginDevelopService extends PluginBaseService
     {
         $frontendPath = $this->getPluginFrontendPath($pluginName, $frontendType);
 
-        // 创建前端目录结构（参考 official 模块）
+        // 创建前端目录结构
         $directories = [
             $frontendPath . '/api',
-            $frontendPath . '/lang/zh-cn',
-            $frontendPath . '/lang/en',
+            $frontendPath . '/lang/zh-CN',
+            $frontendPath . '/lang/en-US',
             $frontendPath . '/views/index',
             $frontendPath . '/components',
             $frontendPath . '/routes',
@@ -113,23 +129,26 @@ class PluginDevelopService extends PluginBaseService
     {
         $backendPath = $this->getBackendPath($pluginName);
 
-        // 创建后端目录结构（参考 official 模块）
+        // 创建后端目录结构（参考 backend/plugin/demo）
         $directories = [
             $backendPath . '/config',
+            $backendPath . '/app',
+            $backendPath . '/app/model',
+            $backendPath . '/app/dao',
             $backendPath . '/app/adminapi/controller',
+            $backendPath . '/app/adminapi/validate',
+            $backendPath . '/app/adminapi/schema',
             $backendPath . '/app/api/controller',
+            $backendPath . '/app/api/validate',
+            $backendPath . '/app/api/schema',
             $backendPath . '/app/service/admin',
             $backendPath . '/app/service/api',
-            $backendPath . '/app/validate',
-            $backendPath . '/app/schema/request',
-            $backendPath . '/app/schema/response',
-            $backendPath . '/app/dao',
-            $backendPath . '/app/model',
             $backendPath . '/public',
-            // Resource 目录
+            // Resource 目录（匹配 demo 结构：resource/data/menu/）
             $backendPath . '/resource/database/migrations',
             $backendPath . '/resource/database/seeds',
-            $backendPath . '/resource/menu',
+            $backendPath . '/resource/data/menu',
+            $backendPath . '/resource/data/config',
             $backendPath . '/resource/template/admin',
             $backendPath . '/resource/template/web',
         ];
@@ -166,13 +185,13 @@ class PluginDevelopService extends PluginBaseService
         $pluginKey       = $this->toKebabCase($pluginName);
 
         // 生成 API 文件
-        $this->generateApiFile($frontendPath, $pluginName, $pluginKey);
+        $this->generateApiFile($frontendPath, $pluginName, $camelPluginName, $pluginTitle, $pluginKey);
 
         // 生成语言文件（中英文）
         $this->generateLangFiles($frontendPath, $pluginName, $pluginTitle, $pluginDescription);
 
-        // 生成页面文件（index.vue）
-        $this->generatePageFile($frontendPath, $pluginName, $camelPluginName, $pluginKey);
+        // 生成页面文件（index.vue + schemas/index.ts）
+        $this->generatePageFile($frontendPath, $pluginName, $camelPluginName, $pluginTitle, $pluginKey);
 
         // 生成 routes/index.ts 文件
         $this->generateRoutesIndexFile($frontendPath, $pluginName, $camelPluginName, $pluginTitle);
@@ -194,10 +213,13 @@ class PluginDevelopService extends PluginBaseService
         // 生成配置文件
         $this->generateConfigFiles($backendPath, $pluginName, $pluginTitle, $pluginDescription);
 
+        // 生成 translation.php 配置
+        $this->generateTranslationFile($backendPath, $pluginName);
+
         // 生成 Install.php 文件
         $this->generateInstallFile($backendPath, $pluginName, $camelPluginName);
 
-        // 生成路由文件（Swagger 注解方式）- 在配置文件生成之后
+        // 生成路由文件（Swagger 注解方式）
         $this->generateRouteFile($backendPath, $pluginName, $camelPluginName, $pluginTitle);
 
         // 生成控制器文件
@@ -206,8 +228,11 @@ class PluginDevelopService extends PluginBaseService
         // 生成菜单配置文件
         $this->generateMenuFiles($backendPath, $pluginName, $pluginTitle);
 
-        // 生成前端模板到 resource/template/admin 目录
+        // 生成前端模板到 resource/template/ 目录
         $this->generateFrontendTemplates($backendPath, $pluginName, $camelPluginName, $pluginKey, $pluginTitle);
+
+        // 生成其他默认模版文件（.gitignore / installed / review）
+        $this->generateDefaultTemplateFiles($backendPath, $pluginName, $pluginTitle);
 
         // 初始化公共资源文件
         $this->initializePublicAssets($backendPath);
@@ -248,18 +273,35 @@ class PluginDevelopService extends PluginBaseService
     /**
      * 生成 API 文件
      *
-     * @param string $frontendPath 前端路径
-     * @param string $pluginName   插件名称
-     * @param string $pluginKey    插件键名
+     * @param string $frontendPath     前端路径
+     * @param string $pluginName       插件名称
+     * @param string $camelPluginName  驼峰命名的插件名称
+     * @param string $pluginTitle      插件标题
+     * @param string $pluginKey        插件键名
      */
-    private function generateApiFile(string $frontendPath, string $pluginName, string $pluginKey): void
+    private function generateApiFile(string $frontendPath, string $pluginName, string $camelPluginName, string $pluginTitle, string $pluginKey): void
     {
-        $stubPath = __DIR__ . self::STUB_PATHS['api'];
-        $content  = $this->renderStub($stubPath, [
-            '{{pluginName}}' => $pluginName,
-            '{{pluginKey}}'  => $pluginKey,
-        ]);
-        file_put_contents($frontendPath . '/api/index.ts', $content);
+        $replacements = [
+            '{{pluginName}}'      => $pluginName,
+            '{{camelPluginName}}' => $camelPluginName,
+            '{{pluginTitle}}'     => $pluginTitle,
+            '{{pluginKey}}'       => $pluginKey,
+        ];
+
+        // 生成 api/{pluginKey}/index.ts
+        $apiDir = $frontendPath . '/api/' . $pluginKey;
+        if (!is_dir($apiDir)) {
+            mkdir($apiDir, 0755, true);
+        }
+
+        $indexStub = __DIR__ . self::STUB_PATHS['api'];
+        $content   = $this->renderStub($indexStub, $replacements);
+        file_put_contents($apiDir . '/index.ts', $content);
+
+        // 生成 api/{pluginKey}/types.ts
+        $typesStub = __DIR__ . self::STUB_PATHS['api_types'];
+        $content   = $this->renderStub($typesStub, $replacements);
+        file_put_contents($apiDir . '/types.ts', $content);
     }
 
     /**
@@ -273,12 +315,12 @@ class PluginDevelopService extends PluginBaseService
     private function generateLangFiles(string $frontendPath, string $pluginName, string $pluginTitle, string $pluginDescription): void
     {
         // 中文语言包
-        $zhContent = "{\n  \"{$pluginName}\": {\n    \"title\": \"{$pluginTitle}\",\n    \"description\": \"{$pluginDescription}\"\n  }\n}";
-        file_put_contents($frontendPath . '/lang/zh-cn/index.json', $zhContent);
+        $zhContent = "{\n  \"{$pluginName}\": {\n    \"title\": \"{$pluginTitle}\"\n  }\n}";
+        file_put_contents($frontendPath . '/lang/zh-CN/index.json', $zhContent);
 
         // 英文语言包
-        $enContent = "{\n  \"{$pluginName}\": {\n    \"title\": \"{$pluginTitle}\",\n    \"description\": \"{$pluginDescription}\"\n  }\n}";
-        file_put_contents($frontendPath . '/lang/en/index.json', $enContent);
+        $enContent = "{\n  \"{$pluginName}\": {\n    \"title\": \"{$pluginTitle}\"\n  }\n}";
+        file_put_contents($frontendPath . '/lang/en-US/index.json', $enContent);
     }
 
     /**
@@ -289,15 +331,28 @@ class PluginDevelopService extends PluginBaseService
      * @param string $camelPluginName 驼峰命名的插件名称
      * @param string $pluginKey       插件键名
      */
-    private function generatePageFile(string $frontendPath, string $pluginName, string $camelPluginName, string $pluginKey): void
+    private function generatePageFile(string $frontendPath, string $pluginName, string $camelPluginName, string $pluginTitle, string $pluginKey): void
     {
-        $stubPath = __DIR__ . self::STUB_PATHS['view'];
-        $content  = $this->renderStub($stubPath, [
+        $replacements = [
             '{{pluginName}}'      => $pluginName,
             '{{camelPluginName}}' => $camelPluginName,
+            '{{pluginTitle}}'     => $pluginTitle,
             '{{pluginKey}}'       => $pluginKey,
-        ]);
+        ];
+
+        // 生成 views/index/index.vue
+        $stubPath = __DIR__ . self::STUB_PATHS['view'];
+        $content  = $this->renderStub($stubPath, $replacements);
         file_put_contents($frontendPath . '/views/index/index.vue', $content);
+
+        // 生成 views/index/schemas/index.ts
+        $viewsDir = $frontendPath . '/views/index/schemas';
+        if (!is_dir($viewsDir)) {
+            mkdir($viewsDir, 0755, true);
+        }
+        $schemaStub = __DIR__ . self::STUB_PATHS['view_schema'];
+        $content    = $this->renderStub($schemaStub, $replacements);
+        file_put_contents($viewsDir . '/index.ts', $content);
     }
 
     /**
@@ -310,11 +365,13 @@ class PluginDevelopService extends PluginBaseService
      */
     private function generateRoutesIndexFile(string $frontendPath, string $pluginName, string $camelPluginName, string $pluginTitle): void
     {
+        $pluginKey = $this->toKebabCase($pluginName);
         $stubPath = __DIR__ . self::STUB_PATHS['routes'];
         $content = $this->renderStub($stubPath, [
             '{{pluginName}}'      => $pluginName,
             '{{camelPluginName}}' => $camelPluginName,
             '{{pluginTitle}}'     => $pluginTitle,
+            '{{pluginKey}}'       => $pluginKey,
         ]);
         file_put_contents($frontendPath . '/routes/index.ts', $content);
     }
@@ -413,18 +470,19 @@ class PluginDevelopService extends PluginBaseService
     private function createGitKeepFiles(string $backendPath): void
     {
         $directories = [
-            '/app/schema/request',
-            '/app/schema/response',
-            '/app/dao',
             '/app/model',
+            '/app/dao',
+            '/app/adminapi/controller',
+            '/app/adminapi/validate',
+            '/app/adminapi/schema',
+            '/app/api/controller',
+            '/app/api/validate',
+            '/app/api/schema',
             '/app/service/admin',
             '/app/service/api',
-            '/app/validate',
-            '/app/api/controller',
             '/resource/database/migrations',
             '/resource/database/seeds',
-            '/resource/template/admin',
-            '/resource/template/web',
+            '/resource/data/config',
         ];
 
         foreach ($directories as $path) {
@@ -453,16 +511,7 @@ class PluginDevelopService extends PluginBaseService
             '{{pluginKey}}'   => $pluginKey,
             '{{pluginTitle}}' => $pluginTitle,
         ]);
-        file_put_contents($backendPath . '/resource/menu/admin.php', $adminContent);
-
-        // 生成 frontend 菜单
-        $frontendStubPath = __DIR__ . self::STUB_PATHS['menu_frontend'];
-        $frontendContent  = $this->renderStub($frontendStubPath, [
-            '{{pluginName}}'  => $pluginName,
-            '{{pluginKey}}'   => $pluginKey,
-            '{{pluginTitle}}' => $pluginTitle,
-        ]);
-        file_put_contents($backendPath . '/resource/menu/frontend.php', $frontendContent);
+        file_put_contents($backendPath . '/resource/data/menu/admin.php', $adminContent);
 
         // 生成 web 菜单
         $webStubPath = __DIR__ . self::STUB_PATHS['menu_web'];
@@ -471,7 +520,7 @@ class PluginDevelopService extends PluginBaseService
             '{{pluginKey}}'   => $pluginKey,
             '{{pluginTitle}}' => $pluginTitle,
         ]);
-        file_put_contents($backendPath . '/resource/menu/web.php', $webContent);
+        file_put_contents($backendPath . '/resource/data/menu/web.php', $webContent);
     }
 
     /**
@@ -485,56 +534,136 @@ class PluginDevelopService extends PluginBaseService
      */
     private function generateFrontendTemplates(string $backendPath, string $pluginName, string $camelPluginName, string $pluginKey, string $pluginTitle): void
     {
-        $templatePath = $backendPath . '/resource/template/admin';
+        // ---- Admin 模板 ----
+        $adminTemplatePath = $backendPath . '/resource/template/admin';
 
-        // 创建模板目录结构
-        $templateDirectories = [
-            $templatePath . '/api',
-            $templatePath . '/lang/zh-cn',
-            $templatePath . '/lang/en',
-            $templatePath . '/views/index',
-            $templatePath . '/components',
-            $templatePath . '/routes',
+        $adminDirectories = [
+            $adminTemplatePath . '/api/test',
+            $adminTemplatePath . '/views/test/schemas',
+            $adminTemplatePath . '/routes',
+            $adminTemplatePath . '/lang/zh-CN',
+            $adminTemplatePath . '/lang/en-US',
+            $adminTemplatePath . '/mock',
         ];
-
-        foreach ($templateDirectories as $directory) {
+        foreach ($adminDirectories as $directory) {
             if (!is_dir($directory)) {
                 mkdir($directory, 0755, true);
             }
         }
 
-        // 生成 API 文件
-        $apiStubPath = __DIR__ . self::STUB_PATHS['api'];
-        $apiContent = $this->renderStub($apiStubPath, [
-            '{{pluginName}}' => $pluginName,
-            '{{pluginKey}}'  => $pluginKey,
-        ]);
-        file_put_contents($templatePath . '/api/index.ts', $apiContent);
-
-        // 生成语言文件
-        $zhContent = "{\n  \"{$pluginName}\": {\n    \"title\": \"{$pluginTitle}\",\n    \"description\": \"Plugin description\"\n  }\n}";
-        file_put_contents($templatePath . '/lang/zh-cn/index.json', $zhContent);
-
-        $enContent = "{\n  \"{$pluginName}\": {\n    \"title\": \"{$pluginTitle}\",\n    \"description\": \"Plugin description\"\n  }\n}";
-        file_put_contents($templatePath . '/lang/en/index.json', $enContent);
-
-        // 生成页面文件
-        $viewStubPath = __DIR__ . self::STUB_PATHS['view'];
-        $viewContent = $this->renderStub($viewStubPath, [
-            '{{pluginName}}'      => $pluginName,
-            '{{camelPluginName}}' => $camelPluginName,
-            '{{pluginKey}}'       => $pluginKey,
-        ]);
-        file_put_contents($templatePath . '/views/index/index.vue', $viewContent);
-
-        // 生成路由文件
-        $routesStubPath = __DIR__ . self::STUB_PATHS['routes'];
-        $routesContent = $this->renderStub($routesStubPath, [
+        $replacements = [
             '{{pluginName}}'      => $pluginName,
             '{{camelPluginName}}' => $camelPluginName,
             '{{pluginTitle}}'     => $pluginTitle,
+            '{{pluginKey}}'       => $pluginKey,
+        ];
+
+        // 生成 api/test/index.ts
+        $this->generateTemplateFromStub('api', $adminTemplatePath . '/api/test/index.ts', $replacements);
+        // 生成 api/test/types.ts
+        $this->generateTemplateFromStub('api_types', $adminTemplatePath . '/api/test/types.ts', $replacements);
+        // 生成 mock/api.ts（平铺）
+        $this->generateTemplateFromStub('mock_api', $adminTemplatePath . '/mock/api.ts', [
+            '{{pluginName}}' => $pluginName,
+            '{{pluginKey}}'  => $pluginKey,
         ]);
-        file_put_contents($templatePath . '/routes/index.ts', $routesContent);
+        // 生成 mock/table-data.ts（平铺）
+        $this->generateTemplateFromStub('mock_table_data', $adminTemplatePath . '/mock/table-data.ts', [
+            '{{pluginName}}' => $pluginName,
+            '{{pluginKey}}'  => $pluginKey,
+        ]);
+        // 生成 views/test/index.vue
+        $this->generateTemplateFromStub('view', $adminTemplatePath . '/views/test/index.vue', $replacements);
+        // 生成 views/test/schemas/index.tsx
+        $this->generateTemplateFromStub('view_schema', $adminTemplatePath . '/views/test/schemas/index.tsx', $replacements);
+        // 生成路由文件（平铺，meta 加 module）
+        $this->generateTemplateFromStub('routes', $adminTemplatePath . '/routes/index.ts', $replacements);
+        // 生成语言包（zh-CN）— lang/zh-CN/{pluginKey}/
+        $this->generateTemplateFromStub('lang_zh_cn', $adminTemplatePath . '/lang/zh-CN/test.json', [
+            '{{pluginName}}'  => $pluginName,
+            '{{pluginTitle}}' => $pluginTitle,
+        ]);
+        // 生成语言包（en-US）— lang/en-US/
+        $this->generateTemplateFromStub('lang_en_us', $adminTemplatePath . '/lang/en-US/test.json', [
+            '{{pluginName}}'  => $pluginName,
+            '{{pluginTitle}}' => $pluginTitle,
+        ]);
+
+        // ---- Web 模板 ----
+        $webTemplatePath = $backendPath . '/resource/template/web';
+
+        $webDirectories = [
+            $webTemplatePath . '/api',
+            $webTemplatePath . '/lang',
+            $webTemplatePath . '/pages',
+        ];
+        foreach ($webDirectories as $directory) {
+            if (!is_dir($directory)) {
+                mkdir($directory, 0755, true);
+            }
+        }
+
+        // 生成 pages/routes.ts
+        $this->generateTemplateFromStub('web_pages_routes', $webTemplatePath . '/pages/routes.ts', [
+            '{{pluginName}}'      => $pluginName,
+            '{{camelPluginName}}' => $camelPluginName,
+            '{{pluginKey}}'       => $pluginKey,
+            '{{pluginTitle}}'     => $pluginTitle,
+        ]);
+    }
+
+    /**
+     * 生成 translation.php 配置
+     */
+    private function generateTranslationFile(string $backendPath, string $pluginName): void
+    {
+        $this->generateTemplateFromStub('translation', $backendPath . '/config/translation.php', [
+            '{{pluginName}}' => $pluginName,
+        ]);
+    }
+
+    /**
+     * 生成默认模版文件
+     * 参考 backend/plugin/demo 目录结构
+     *
+     * @param string $backendPath  后端路径
+     * @param string $pluginName   插件名称
+     * @param string $pluginTitle  插件标题
+     */
+    private function generateDefaultTemplateFiles(string $backendPath, string $pluginName, string $pluginTitle): void
+    {
+        // 1. 生成 .gitignore
+        $this->generateTemplateFromStub('gitignore', $backendPath . '/.gitignore', [
+            '{{pluginName}}' => $pluginName,
+        ]);
+
+        // 2. 生成 config/installed.php
+        $this->generateTemplateFromStub('installed', $backendPath . '/config/installed.php', [
+            '{{pluginName}}' => $pluginName,
+        ]);
+
+        // 3. 生成 config/review.php
+        $this->generateTemplateFromStub('review', $backendPath . '/config/review.php', [
+            '{{pluginName}}'  => $pluginName,
+            '{{pluginTitle}}' => $pluginTitle,
+        ]);
+    }
+
+    /**
+     * 从 stub 生成文件
+     *
+     * @param string $stubKey   STUB_PATHS 中的键名
+     * @param string $targetPath 目标文件路径
+     * @param array  $replacements 替换内容
+     */
+    private function generateTemplateFromStub(string $stubKey, string $targetPath, array $replacements): void
+    {
+        if (!isset(self::STUB_PATHS[$stubKey])) {
+            return;
+        }
+        $stubPath = __DIR__ . self::STUB_PATHS[$stubKey];
+        $content  = $this->renderStub($stubPath, $replacements);
+        file_put_contents($targetPath, $content);
     }
 
     /**
@@ -859,11 +988,8 @@ class PluginDevelopService extends PluginBaseService
             $buildPath . '/app/controller',
             $buildPath . '/app/service/admin',
             $buildPath . '/app/service/api',
-            $buildPath . '/app/validate',
             $buildPath . '/app/dao',
             $buildPath . '/app/model',
-            $buildPath . '/app/schema/request',
-            $buildPath . '/app/schema/response',
             $buildPath . '/config',
             $buildPath . '/resource/template/admin',
             $buildPath . '/resource/template/web',

@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -7,9 +9,8 @@
  *+------------------
  * Author: Mr. April (405784684@qq.com)
  *+------------------
- * Official Website: https://madong.tech
+ * Official Website: http://www.madong.tech
  */
-
 namespace app\middleware;
 
 use Webman\Http\Request;
@@ -39,7 +40,6 @@ class Lang implements MiddlewareInterface
         } else {
             $locale = config('app.lang');
         }
-        // 设置会话中的语言
 
         session('lang', $locale);
         locale($locale);

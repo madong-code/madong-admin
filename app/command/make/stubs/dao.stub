@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace DummyNamespace;
 
 use app\model\DummyModel;
-use core\base\BaseDao;
+use core\foundation\base\BaseDao;
 
 /**
  * DummyClass数据访问对象

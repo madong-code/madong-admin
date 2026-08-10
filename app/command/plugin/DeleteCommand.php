@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -11,11 +12,11 @@ declare(strict_types=1);
  * Official Website: http://www.madong.tech
  */
 
-
 namespace app\command\plugin;
 
 use app\command\BaseCommand;
 use app\service\core\plugin\PluginUninstallService;
+use support\Container;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -71,17 +72,13 @@ class DeleteCommand extends BaseCommand
         }
 
         try {
-            // 创建删除服务实例（统一入口）
-            $deleteService = new PluginUninstallService();
+            // 通过容器获取删除服务实例（统一入口）
+            $deleteService = Container::get(PluginUninstallService::class);
 
-            // 执行删除流程
-            $result = $deleteService->delete($name);
+            // 执行删除流程（失败会抛异常）
+            $deleteService->delete($name);
 
-            if ($result) {
-                return $this->outputSuccess($io, "Plugin '{$name}' deleted successfully!");
-            } else {
-                return $this->outputError($io, "Plugin '{$name}' deletion failed!");
-            }
+            return $this->outputSuccess($io, "Plugin '{$name}' deleted successfully!");
 
         } catch (\Exception $e) {
             return $this->outputError($io, sprintf("Deletion failed: %s", $e->getMessage()), $e);

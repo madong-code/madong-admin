@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -13,10 +14,9 @@ declare(strict_types=1);
 
 namespace app\api\middleware;
 
-
-use core\exception\handler\UnauthorizedHttpException;
-use core\jwt\JwtToken;
-use core\tool\Json;
+use core\foundation\exception\handler\UnauthorizedHttpException;
+use core\security\jwt\JwtToken;
+use core\foundation\tool\Json;
 use madong\swagger\attribute\AllowAnonymous;
 use madong\swagger\helper\AnnotationHelper;
 use Webman\Http\Request;
@@ -43,7 +43,7 @@ final class ApiAccessTokenMiddleware implements MiddlewareInterface
         $action          = $request->action;
 
         $skipAuth = AnnotationHelper::getMethodAnnotation($controllerClass, $action, AllowAnonymous::class);
-        if ($skipAuth && !$skipAuth->shouldRequireToken()) {
+        if ($skipAuth && !$skipAuth->requireToken) {
             return $handler($request);
         }
 

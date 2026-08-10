@@ -1,10 +1,20 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\model\member;
 
 use app\model\web\Menu;
-use core\base\BaseModel;
+use core\foundation\base\BaseModel;
 use app\enum\common\EnabledStatus;
 
 /**
@@ -34,6 +44,10 @@ class MemberTag extends BaseModel
         'enabled',
         'created_at',
         'updated_at',
+    ];
+
+    protected $casts = [
+        'id'        => 'string',
     ];
 
     /**

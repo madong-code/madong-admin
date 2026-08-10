@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  *+------------------
@@ -10,10 +11,10 @@
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 namespace app\service\core\plugin;
 
-use core\base\BaseService;
+use core\business\plugin\PluginPath;
+use core\foundation\base\BaseService;
 
 /**
  * 插件基类服务
@@ -57,23 +58,9 @@ abstract class PluginBaseService extends BaseService
      */
     protected string $plugin_path;
 
-    /**
-     * 项目根目录（前端和后端的父级目录）
-     * 注意：此路径已不再直接指向前端目录
-     * 前端目录统一在 $project_path/frontend 下，如 admin、web、uni-app 等
-     */
-    protected string $project_path;
-
-    /**
-     * 后端根目录
-     */
-    protected string $server_path;
-
     public function __construct()
     {
         $this->plugin_path = base_path('plugin');
-        $this->project_path = dirname(base_path()); // 项目根目录（前端和后端的父级）
-        $this->server_path = base_path(); // 后端根目录
     }
 
     /**
@@ -84,7 +71,7 @@ abstract class PluginBaseService extends BaseService
      */
     public function getFrontendPath(): string
     {
-        return $this->project_path . DIRECTORY_SEPARATOR . 'frontend';
+        return PluginPath::frontendPath();
     }
 
     /**
@@ -95,7 +82,7 @@ abstract class PluginBaseService extends BaseService
      */
     public function getFrontendProjectPath(string $frontendType): string
     {
-        return $this->getFrontendPath() . DIRECTORY_SEPARATOR . $frontendType;
+        return PluginPath::frontendProjectPath($frontendType);
     }
 
     /**
@@ -168,16 +155,20 @@ abstract class PluginBaseService extends BaseService
             return true;
         } catch (\Exception $e) {
             // 插件方法执行失败，记录日志
-            $logLevel = $silent ? 'warning' : 'error';
-            \support\Log::$logLevel('插件方法执行失败', [
-                'plugin' => $code,
-                'action' => $action,
-                'version' => $version,
+            $logContext = [
+                'plugin'     => $code,
+                'action'     => $action,
+                'version'    => $version,
                 'old_version' => $oldVersion,
-                'exception' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
+                'exception'  => $e->getMessage(),
+                'file'       => $e->getFile(),
+                'line'       => $e->getLine(),
+            ];
+            if ($silent) {
+                \support\Log::warning('插件方法执行失败', $logContext);
+            } else {
+                \support\Log::error('插件方法执行失败', $logContext);
+            }
             
             // 静默模式不抛出异常，非静默模式抛出异常
             if (!$silent) {

@@ -1,6 +1,16 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\service\api\member;
 
 use app\api\CurrentMember;
@@ -9,7 +19,8 @@ use app\dao\member\MemberThirdPartyDao;
 use app\model\member\Member;
 use app\model\member\MemberAddress;
 use app\enum\common\EnabledStatus;
-use core\base\BaseService;
+use core\foundation\base\BaseService;
+use core\security\jwt\JwtToken;
 use support\Container;
 use support\Redis;
 
@@ -267,24 +278,33 @@ class MemberService extends BaseService
     }
 
     /**
-     * 获取当前用户ID
+     * 获取当前用户ID（通过 JWT 解析 token）
      */
     private function getCurrentMemberId(): int
     {
         $request = \request();
-        $token   = $request->header('Authorization');
+        $auth    = $request->header('Authorization', '');
 
-        if (!$token) {
+        if (empty($auth) || $auth === 'undefined') {
             throw new \Exception('未登录', 401);
         }
 
-        $tokenData = Redis::get('user_token:' . md5($token));
-        if (!$tokenData) {
-            throw new \Exception('登录已过期', 401);
+        // 去除 Bearer 前缀
+        $token = $auth;
+        if (str_starts_with($token, 'Bearer ')) {
+            $token = substr($token, 7);
         }
 
-        $data = json_decode($tokenData, true);
-        return $data['member_id'] ?? 0;
+        try {
+            $payload = (new JwtToken())->parse($token);
+            $mid     = $payload['id'] ?? null;
+            if (empty($mid)) {
+                throw new \Exception('登录已过期', 401);
+            }
+            return (int)$mid;
+        } catch (\Throwable $e) {
+            throw new \Exception('登录已过期', 401);
+        }
     }
 
     /**
@@ -359,5 +379,40 @@ class MemberService extends BaseService
     public function isAdmin(int|string $userId): bool
     {
         return false;
+    }
+
+    /**
+     * 更新会员邮箱
+     *
+     * @param array $data { email, verify_code }
+     * @throws \Exception
+     */
+    public function updateEmail(array $data): void
+    {
+        if (empty($data['email']) || empty($data['verify_code'])) {
+            throw new \Exception('邮箱和验证码不能为空', 400);
+        }
+
+        // 验证邮箱验证码
+        $this->verifySmsCode($data['email'], $data['verify_code']);
+
+        $memberId = $this->getCurrentMemberId();
+        $member   = Member::find($memberId);
+
+        if (!$member) {
+            throw new \Exception('用户不存在', 401);
+        }
+
+        // 检查邮箱是否已被其他用户绑定
+        $existingMember = Member::where('email', $data['email'])
+            ->where('id', '!=', $memberId)
+            ->first();
+
+        if ($existingMember) {
+            throw new \Exception('邮箱已被其他用户绑定', 400);
+        }
+
+        $member->email = $data['email'];
+        $member->save();
     }
 }

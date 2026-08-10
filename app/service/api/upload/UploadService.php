@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -13,19 +14,20 @@ declare(strict_types=1);
 
 namespace app\service\api\upload;
 
-use app\dao\system\UploadDao;
-use app\service\admin\system\ConfigService;
-use core\base\BaseService;
-use core\exception\handler\AdminException;
-use core\upload\UploadFile;
+use app\dao\system\config\UploadDao;
+use core\foundation\base\BaseService;
+use core\foundation\exception\handler\AdminException;
+use core\io\upload\support\StoragePathResolver;
+use core\io\upload\UploadFile;
+use core\io\upload\UploadScene;
 use madong\helper\Arr;
-use support\Container;
 
 /**
  * 上传服务类
  *
- * @author Mr.April
- * @since  1.0
+ * 支持两种上传场景：
+ * - 管理端上传：使用 UploadScene::admin()
+ * - 接口端上传：使用 UploadScene::api()（group_code=default）
  */
 class UploadService extends BaseService
 {
@@ -33,6 +35,14 @@ class UploadService extends BaseService
     public function __construct(UploadDao $dao)
     {
         $this->dao = $dao;
+    }
+
+    /**
+     * 根据当前请求上下文决议上传场景
+     */
+    private function getScene(): UploadScene
+    {
+        return false ? UploadScene::admin() : UploadScene::api();
     }
 
     /**
@@ -52,7 +62,7 @@ class UploadService extends BaseService
                 if ($isLocal) {
                     $config['mode'] = 'local';
                 }
-                return $this->handleUpload($config, $upload, $isLocal);
+                return $this->handleUpload($config, $upload);
             });
         } catch (\Exception $e) {
             throw new AdminException($e->getMessage());
@@ -76,7 +86,7 @@ class UploadService extends BaseService
                 if ($isLocal) {
                     $config['mode'] = 'local';
                 }
-                return $this->handleUpload($config, $upload, $isLocal);
+                return $this->handleUpload($config, $upload);
             });
         } catch (\Exception $e) {
             throw new AdminException($e->getMessage());
@@ -108,7 +118,7 @@ class UploadService extends BaseService
                 if ($isLocal) {
                     $config['mode'] = 'local';
                 }
-                return $this->handleUpload($config, $upload, $isLocal);
+                return $this->handleUpload($config, $upload);
             });
         } catch (\Exception $e) {
             throw new AdminException($e->getMessage());
@@ -125,7 +135,8 @@ class UploadService extends BaseService
      */
     public function fetchImage(string $url): array
     {
-        $config = UploadFile::config('local');
+        $scene = $this->getScene();
+        $config = UploadFile::config('local', [], $scene);
         $data   = file_get_contents($url);
         if ($data === false) {
             throw new AdminException('获取文件资源失败');
@@ -170,14 +181,19 @@ class UploadService extends BaseService
         }
         $hash   = md5_file($save_path);
         $size   = filesize($save_path);
+        // 去重：同一 hash 文件直接复用，禁止重复落盘
         $result = $this->dao->get(['hash' => $hash]);
         if (!empty($result)) {
             unlink($save_path);
             return $result->toArray();
         }
-        $root     = Arr::fetchConfigValue($config, 'root');
+        $root     = Arr::fetchConfigValue($config, 'root') ?: 'public';
+        $dirname  = Arr::fetchConfigValue($config, 'dirname') ?: 'upload';
         $folder   = date('Ymd');
-        $full_dir = base_path() . DIRECTORY_SEPARATOR . $root . $folder . DIRECTORY_SEPARATOR;
+        $resolver = new StoragePathResolver();
+        $relative = $resolver->joinPaths($dirname, $resolver->pathSegment($config), $folder);
+        $full_dir = base_path() . DIRECTORY_SEPARATOR . $root . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, $relative) . DIRECTORY_SEPARATOR;
         if (!is_dir($full_dir)) {
             mkdir($full_dir, 0777, true);
         }
@@ -185,19 +201,17 @@ class UploadService extends BaseService
         $newPath     = $full_dir . $object_name;
         copy($save_path, $newPath);
         unlink($save_path);
-        $domain                    = Arr::fetchConfigValue($config, 'domain');
-        $dirname                   = Arr::fetchConfigValue($config, 'dirname');
-        $baseUrl                   = $dirname . $folder . '/';
         $info['platform']          = 'local';
         $info['original_filename'] = $filename;
         $info['filename']          = $object_name;
         $info['hash']              = $hash;
         $info['content_type']      = $content_type;
-        $info['base_path']         = $root . $folder . '/' . $object_name;
+        $info['base_path']         = '/' . $relative . '/' . $object_name;
+        $info['path']              = $relative . '/' . $object_name;
         $info['ext']               = $file_extension;
         $info['size']              = $size;
         $info['size_info']         = formatBytes($size);
-        $info['url']               = $baseUrl . $object_name;
+        $info['url']               = $relative . '/' . $object_name;
         $result                    = $this->dao->save($info);
         return $result->toArray();
     }
@@ -279,15 +293,21 @@ class UploadService extends BaseService
         }
         $hash   = md5_file($save_path);
         $size   = filesize($save_path);
+        // 去重：同一 hash 文件直接复用，禁止重复落盘
         $result = $this->dao->get(['hash' => $hash]);
         if (!empty($result)) {
             unlink($save_path);
             return $result->toArray();
         }
-        $config   = UploadFile::getConfig('local');
-        $root     = Arr::fetchConfigValue($config, 'root');
+        $scene    = $this->getScene();
+        $config   = UploadFile::config('local', [], $scene);
+        $root     = Arr::fetchConfigValue($config, 'root') ?: 'public';
+        $dirname  = Arr::fetchConfigValue($config, 'dirname') ?: 'upload';
         $folder   = date('Ymd');
-        $full_dir = base_path() . DIRECTORY_SEPARATOR . $root . $folder . DIRECTORY_SEPARATOR;
+        $resolver = new StoragePathResolver();
+        $relative = $resolver->joinPaths($dirname, $resolver->pathSegment($config), $folder);
+        $full_dir = base_path() . DIRECTORY_SEPARATOR . $root . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, $relative) . DIRECTORY_SEPARATOR;
         if (!is_dir($full_dir)) {
             mkdir($full_dir, 0777, true);
         }
@@ -295,18 +315,17 @@ class UploadService extends BaseService
         $newPath     = $full_dir . $object_name;
         copy($save_path, $newPath);
         unlink($save_path);
-        $dirname                   = Arr::fetchConfigValue($config, 'dirname');
-        $baseUrl                   = $dirname . $folder . '/';
         $info['platform']          = 'local';
         $info['original_filename'] = $filename;
         $info['filename']          = $object_name;
         $info['hash']              = $hash;
         $info['content_type']      = $content_type;
-        $info['base_path']         = $root . $folder . '/' . $object_name;
+        $info['base_path']         = '/' . $relative . '/' . $object_name;
+        $info['path']              = $relative . '/' . $object_name;
         $info['ext']               = $file_extension;
         $info['size']              = $size;
         $info['size_info']         = formatBytes($size);
-        $info['url']               = $baseUrl . $object_name;
+        $info['url']               = $relative . '/' . $object_name;
         $result                    = $this->dao->save($info);
         return $result->toArray();
     }
@@ -316,23 +335,25 @@ class UploadService extends BaseService
      *
      * @param array  $config
      * @param string $upload
-     * @param bool   $isLocal
      *
      * @return mixed
      * @throws \Throwable
      */
-    private function handleUpload(array $config, string $upload = '', bool $isLocal = false): mixed
+    private function handleUpload(array $config, string $upload = ''): mixed
     {
+        $scene = $this->getScene();
+
         $options = [];
         if (!empty($upload)) {
             $options['sub_dir'] = $upload;
         }
-        $result = UploadFile::uploadFile($options);
+        // 使用显式 scene 调用，替代默认静态 UploadFile::uploadFile()
+        $result = UploadFile::disk(null, true, $scene)->uploadFile($options);
         $data   = $result[0];
         $url    = str_replace('\\', '/', $data['url']);
         $path   = str_replace('\\', '/', $data['save_path']);
 
-        // 检查文件是否已存在
+        // 检查文件是否已存在（按 hash 去重，禁止重复落盘）
         if ($filesInfo = $this->dao->get(['hash' => $data['unique_id']])) {
             return $filesInfo;
         }
@@ -361,12 +382,13 @@ class UploadService extends BaseService
      */
     private function getUploadConfig(): array
     {
+        $scene = $this->getScene();
         return UploadFile::config('upload', [
             'mode'         => 'local',
             'single_limit' => 1024 * 1024,
             'total_limit'  => 1024 * 1024,
             'nums'         => 10,
             'exclude'      => ['php', 'ext', 'exe'],
-        ]);
+        ], $scene);
     }
 }

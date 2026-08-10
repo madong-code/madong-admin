@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -13,7 +14,7 @@ declare(strict_types=1);
 
 namespace app\queue\redis;
 
-use Webman\RedisQueue\Consumer;
+use core\foundation\base\BaseQueueConsumer;
 
 /**
  * 删除导出的残留excel文件
@@ -21,33 +22,19 @@ use Webman\RedisQueue\Consumer;
  * @author Mr.April
  * @since  1.0
  */
-class RemoveExcelFile implements Consumer
+class RemoveExcelFile extends BaseQueueConsumer
 {
-
-    // 要消费的队列名
     public string $queue = 'remove-excel-file';
+    protected int $maxRetry = 1; // 文件删除无需多次重试
 
-    // 连接名，对应 plugin/webman/redis-queue/redis.php 里的连接`
-    public string $connection = 'default';
-
-    public function consume($data)
+    protected function handle(array $data): void
     {
         $filePath = $data['file_path'] ?? '';
-        $this->deleteFile(runtime_path() . $filePath);
-    }
+        if (empty($filePath)) return;
 
-    /**
-     * 删除指定路径的文件
-     *
-     * @param string $filePath 文件路径
-     *
-     * @return bool 返回删除结果
-     */
-    public function deleteFile(string $filePath): bool
-    {
-        if (file_exists($filePath)) {
-            return unlink($filePath);
+        $fullPath = runtime_path() . $filePath;
+        if (file_exists($fullPath)) {
+            unlink($fullPath);
         }
-        return false;
     }
 }

@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -21,8 +22,8 @@ use app\adminapi\schema\request\system\RecycleBinQueryRequest;
 use app\adminapi\schema\response\system\RecycleBinResponse;
 use app\schema\request\BatchDeleteRequest;
 use app\schema\request\IdRequest;
-use app\service\admin\system\RecycleBinService;
-use core\tool\Json;
+use app\service\admin\system\recycle\RecycleBinService;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\PageResponse;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\Permission;
@@ -117,6 +118,30 @@ final class RecycleBinController extends Crud
         try {
             $id = $request->input('id');
             $this->service->restoreRecycleBin($id);
+            return Json::success('ok');
+        } catch (\Exception $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    #[OA\Put(
+        path: '/system/recycle/restore',
+        summary: '批量恢复',
+        tags: ['数据回收站'],
+    )]
+    #[Permission(code: 'system:recycle:recover')]
+    #[SimpleResponse(schema: [], example: [])]
+    public function batchRestore(Request $request): \support\Response
+    {
+        try {
+            $ids = $request->input('ids', []);
+            if (is_string($ids)) {
+                $ids = explode(',', $ids);
+            }
+            if (empty($ids)) {
+                return Json::fail('请选择要恢复的回收站记录');
+            }
+            $this->service->restoreRecycleBins($ids);
             return Json::success('ok');
         } catch (\Exception $e) {
             return Json::fail($e->getMessage());

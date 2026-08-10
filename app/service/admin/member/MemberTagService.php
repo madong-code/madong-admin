@@ -1,6 +1,16 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\service\admin\member;
 
 use app\dao\member\MemberDao;
@@ -8,8 +18,8 @@ use app\dao\member\MemberTagDao;
 use app\dao\member\MemberTagRelationDao;
 use app\model\web\Menu;
 use app\model\member\MemberTag;
-use core\base\BaseService;
-use core\exception\handler\AdminException;
+use core\foundation\base\BaseService;
+use core\foundation\exception\handler\AdminException;
 use support\Container;
 
 /**
@@ -233,6 +243,85 @@ class MemberTagService extends BaseService
             ->orderBy('sort')
             ->get()
             ->toArray();
+    }
+
+    /**
+     * 获取未包含在指定标签中的会员列表
+     */
+    public function getExcludedMembers(int $tagId, array $params): array
+    {
+        $tag = $this->dao->get($tagId);
+        if (!$tag) {
+            throw new AdminException('标签不存在');
+        }
+
+        $page  = (int)($params['page'] ?? 1);
+        $limit = (int)($params['limit'] ?? 10);
+        $username = $params['username'] ?? '';
+        $nickname = $params['nickname'] ?? '';
+
+        /** @var MemberTagRelationDao $relationDao */
+        $relationDao = Container::make(MemberTagRelationDao::class);
+
+        // 获取标签关联的会员ID
+        $relations = $relationDao->selectList(
+            [['tag_id', '=', $tagId]],
+            'member_id',
+            0, 10000
+        );
+        $memberIds = $relations->pluck('member_id')->toArray();
+
+        /** @var MemberDao $memberDao */
+        $memberDao = Container::make(MemberDao::class);
+
+        // 构建排除条件
+        $where = [];
+        if (!empty($memberIds)) {
+            $where[] = ['id', 'not in', $memberIds];
+        }
+        if (!empty($username)) {
+            $where[] = ['username', 'like', "%{$username}%"];
+        }
+        if (!empty($nickname)) {
+            $where[] = ['nickname', 'like', "%{$nickname}%"];
+        }
+
+        $field = '*';
+        $order = 'create_time desc';
+
+        [$total, $list] = $memberDao->getList($where, $field, $page, $limit, $order);
+
+        return compact('total', 'list');
+    }
+
+    /**
+     * 为标签保存菜单权限（通过菜单ID）
+     */
+    public function saveTagMenuIds(int $tagId, array $menuIds): bool
+    {
+        $tag = $this->dao->get($tagId);
+        if (!$tag) {
+            throw new AdminException('标签不存在');
+        }
+
+        // 验证菜单ID是否存在
+        if (!empty($menuIds)) {
+            $validIds = Menu::whereIn('id', $menuIds)->pluck('id')->toArray();
+            if (count($validIds) !== count($menuIds)) {
+                $invalidIds = array_diff($menuIds, $validIds);
+                throw new AdminException('以下菜单ID不存在: ' . implode(', ', $invalidIds));
+            }
+        }
+
+        $tagModel = MemberTag::find($tagId);
+        if (!$tagModel) {
+            throw new AdminException('标签不存在');
+        }
+
+        // 使用 belongsToMany 同步菜单ID
+        $tagModel->permissions()->sync($menuIds);
+
+        return true;
     }
 
     /**

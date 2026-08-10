@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -18,15 +19,15 @@ use app\adminapi\middleware\AccessTokenMiddleware;
 use app\adminapi\middleware\OperationMiddleware;
 use app\adminapi\middleware\PermissionMiddleware;
 use app\adminapi\validate\member\MemberPointsValidate;
+use app\schema\request\IdRequest;
 use app\service\admin\member\MemberPointsService;
+use core\foundation\exception\handler\AdminException;
+use core\foundation\tool\Json;
 use madong\swagger\attribute\Permission;
-use core\exception\handler\AdminException;
-use core\tool\Json;
-use madong\swagger\annotation\response\PageResponse;
-use madong\swagger\annotation\response\SimpleResponse;
 use OpenApi\Attributes as OA;
 use support\Request;
 use support\annotation\Middleware;
+use WebmanTech\Swagger\DTO\SchemaConstants;
 
 #[Middleware(AccessTokenMiddleware::class, PermissionMiddleware::class, OperationMiddleware::class)]
 final class PointsController extends Crud
@@ -88,7 +89,7 @@ final class PointsController extends Crud
             $id   = $request->route->param('id');
             $data = $this->service->get($id, ['*'], ['member'], 'created_at', []);
             if (empty($data)) {
-                throw new AdminException('数据未找到', ['errorCode' => 400]);
+                throw new AdminException('数据未找到', 400);
             }
             return Json::success('ok', $data->toArray());
         } catch (\Throwable $e) {
@@ -110,7 +111,17 @@ final class PointsController extends Crud
                 new OA\Property(property: "operator", type: "string", example: "admin"),
             ])
         ),
-        tags: ['会员积分']
+        tags: ['会员积分'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "成功",
+                content: new OA\JsonContent(properties: [
+                    new OA\Property(property: "code", type: "integer", example: 0),
+                    new OA\Property(property: "msg", type: "string", example: "操作成功"),
+                ])
+            ),
+        ]
     )]
     #[Permission("member:points:create")]
     public function store(Request $request): \support\Response

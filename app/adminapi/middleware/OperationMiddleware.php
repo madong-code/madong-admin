@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -14,7 +15,7 @@ declare(strict_types=1);
 namespace app\adminapi\middleware;
 
 use app\adminapi\CurrentUser;
-use app\adminapi\event\OperationLogEvent;
+use app\adminapi\event\system\OperationLogEvent;
 use madong\helper\Arr;
 use madong\swagger\attribute\AllowAnonymous;
 use madong\swagger\helper\AnnotationHelper;

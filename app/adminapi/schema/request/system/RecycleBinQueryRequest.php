@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -12,8 +13,6 @@ declare(strict_types=1);
  */
 namespace app\adminapi\schema\request\system;
 
-
-
 use app\schema\request\BaseQueryRequest;
 use OpenApi\Attributes as OA;
 use WebmanTech\DTO\Attributes\ValidationRules;
@@ -24,7 +23,6 @@ use WebmanTech\DTO\Attributes\ValidationRules;
 )]
 class RecycleBinQueryRequest extends BaseQueryRequest
 {
-
 
     #[OA\Property(
         property: 'table_name',

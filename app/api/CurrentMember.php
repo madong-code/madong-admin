@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -16,10 +17,10 @@ namespace app\api;
 use app\model\member\Member;
 use app\service\api\member\MemberService;
 use app\service\admin\member\MemberAuthService;
-use core\cache\CacheService;
-use core\exception\handler\ForbiddenHttpException;
-use core\jwt\JwtToken;
-use core\logger\Logger;
+use core\infrastructure\cache\CacheService;
+use core\foundation\exception\handler\ForbiddenHttpException;
+use core\security\jwt\JwtToken;
+use core\infrastructure\logger\Logger;
 use madong\swagger\attribute\Permission;
 
 /**
@@ -99,7 +100,7 @@ final class CurrentMember
     public function refresh(): array
     {
         if (!$this->getToken()) {
-            Logger::debug("当前会员无有效 Token，无法刷新");
+            Logger::debug("当前会员无有效 Token，无法刷新", []);
             return [];
         }
         return (new JwtToken())->refresh()->toArray();
@@ -111,11 +112,14 @@ final class CurrentMember
         if (!$token) {
             return 0;
         }
-        $mid = (new JwtToken())->id();
-        if ($mid === null) {
+        try {
+            $payload = (new JwtToken())->parse($token);
+            $mid     = $payload['id'] ?? null;
+            return $mid !== null ? $mid : 0;
+        } catch (\Throwable $e) {
+            Logger::error('CurrentMember::id() JWT 解析失败: ' . $e->getMessage(), ['token_prefix' => substr($token, 0, 10) . '...']);
             return 0;
         }
-        return $mid ?? 0;
     }
 
     public function getToken(): ?string
@@ -124,7 +128,7 @@ final class CurrentMember
         if (empty($request)) {
             return null;
         }
-        $tokenName     = config('core.jwt.app.token_name', 'Authorization');
+        $tokenName     = config('core.security.jwt.token_name', 'Authorization');
         $authorization = $request->header($tokenName);
         if (empty($authorization) || $authorization === 'undefined') {
             $authorization = $request->get('token');
@@ -178,13 +182,7 @@ final class CurrentMember
         if (!$token) {
             return false;
         }
-        try {
-            (new JwtToken())->logout($token);
-            return true;
-        } catch (\Exception $e) {
-            Logger::error("登出失败: " . $e->getMessage());
-            return false;
-        }
+        return (new JwtToken())->logout($token);
     }
 
     /**
@@ -197,7 +195,7 @@ final class CurrentMember
             $jwt = new JwtToken();
             // 使用 getPayloadFromRequest() 方法获取负载信息
             $payload = $jwt->getPayloadFromRequest();
-            return $payload['ext'] ?? $payload;
+            return $payload['extra'] ?? $payload;
         } catch (\Exception $e) {
             return [];
         }

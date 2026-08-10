@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  *+------------------
@@ -10,7 +11,6 @@
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 namespace app\service\core\metadata;
 
 use ReflectionClass;
@@ -166,6 +166,12 @@ class MetadataCollectorService
                             // 检查是否是 swagger 注解
                             if (str_starts_with($attributeName, 'OpenApi\\Attributes\\')) {
                                 try {
+                                    // 提取 HTTP 方法：OpenApi\Attributes\Get → GET
+                                    $httpMethod = strtoupper(substr($attributeName, strlen('OpenApi\\Attributes\\')));
+                                    if (in_array($httpMethod, ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'])) {
+                                        $swaggerInfo['httpMethod'] = $httpMethod;
+                                    }
+
                                     $args = $attribute->getArguments();
                                     if (isset($args['tags'])) {
                                         // 处理 tags，确保是字符串数组

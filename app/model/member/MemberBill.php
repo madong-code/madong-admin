@@ -1,9 +1,19 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\model\member;
 
-use core\base\BaseModel;
+use core\foundation\base\BaseModel;
 use app\enum\member\BillType;
 use app\enum\member\BillCategory;
 use app\enum\member\BillStatus;
@@ -38,6 +48,11 @@ class MemberBill extends BaseModel
         'status',
         'created_at',
         'updated_at',
+    ];
+
+    protected $casts = [
+        'id'        => 'string',
+        'member_id' => 'string',
     ];
 
     /**

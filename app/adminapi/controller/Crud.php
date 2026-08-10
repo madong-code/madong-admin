@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -13,9 +14,9 @@ declare(strict_types=1);
 
 namespace app\adminapi\controller;
 
-use core\excel\ExcelExportService;
-use core\exception\handler\AdminException;
-use core\tool\Json;
+use core\io\excel\ExcelExportService;
+use core\foundation\exception\handler\AdminException;
+use core\foundation\tool\Json;
 use Illuminate\Database\Eloquent\Model;
 use madong\helper\Arr;
 use madong\helper\DateTime;
@@ -139,7 +140,7 @@ class Crud extends Base
             $id   = $request->route->param('id');
             $data = $this->service->get($id);
             if (empty($data)) {
-                throw new AdminException('数据未找到', ['errorCode' => 400]);
+                throw new AdminException('数据未找到', 400);
             }
             return Json::success('ok', $data->toArray());
         } catch (\Throwable $e) {
@@ -969,10 +970,6 @@ class Crud extends Base
         return $query;
     }
 
-
-
-
-
     /**
      * 获取 SelectInput 配置
      * 保持原有行为，默认不启用新特性
@@ -1056,7 +1053,6 @@ class Crud extends Base
                 $validFields[] = $f;
             }
         }
-
 
         return empty($validFields) ? '*' : implode(', ', $validFields);
     }

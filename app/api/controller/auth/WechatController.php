@@ -1,11 +1,21 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\api\controller\auth;
 
 use app\api\controller\Base;
 use app\service\api\auth\WechatService;
-use core\tool\Json;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
 use OpenApi\Attributes as OA;
@@ -86,6 +96,7 @@ final class WechatController extends Base
         tags: ['微信认证']
     )]
     #[SimpleResponse(schema: [], example: [])]
+    #[AllowAnonymous(requireToken: false, requirePermission: false, description: '公共接口')]
     public function generateWechatQrCode(): Response
     {
         $result = $this->service->generateWechatQrCode();

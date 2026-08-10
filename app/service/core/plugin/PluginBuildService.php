@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -9,11 +11,11 @@
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 namespace app\service\core\plugin;
 
 use app\service\admin\system\MenuService;
-use core\exception\handler\PluginException;
+use core\business\plugin\PluginPath;
+use core\foundation\exception\handler\PluginException;
 
 /**
  * 插件构建服务
@@ -35,7 +37,7 @@ final class PluginBuildService extends PluginBaseService
     public function build(string $plugin): true
     {
         $this->plugin = $plugin;
-        $this->pluginPath = base_path() . 'plugin' . DIRECTORY_SEPARATOR . $plugin . DIRECTORY_SEPARATOR;
+        $this->pluginPath = PluginPath::pluginRoot($plugin) . DIRECTORY_SEPARATOR;
 
         if (!is_dir($this->pluginPath)) {
             throw new PluginException('目录中不存在此项插件');
@@ -67,7 +69,7 @@ final class PluginBuildService extends PluginBaseService
     public function syncMenu(string $appType): true
     {
 
-        $menuService = new MenuService();
+        $menuService = \support\Container::get(MenuService::class);
         $where = [
             ['app_type', '=', $appType],
             ['plugin', '=', $this->plugin]
@@ -192,14 +194,14 @@ final class PluginBuildService extends PluginBaseService
 
             $content .= $indent;
             if (is_string($key)) {
-                $content .= "'{$key}' => ";
+                $content .= var_export($key, true) . ' => ';
             }
 
             if (is_array($value)) {
                 $content .= '[' . PHP_EOL . $this->formatArrayToPhp($value, $level + 1);
                 $content .= $indent . '],' . PHP_EOL;
             } else {
-                $content .= "'{$value}'," . PHP_EOL;
+                $content .= var_export((string) $value, true) . ',' . PHP_EOL;
             }
         }
 
@@ -213,7 +215,7 @@ final class PluginBuildService extends PluginBaseService
      */
     public function packageAdmin(): true
     {
-        $sourcePath = $this->getFrontendProjectPath('admin') . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'addon' . DIRECTORY_SEPARATOR . $this->plugin . DIRECTORY_SEPARATOR;
+        $sourcePath = PluginPath::templateProjectPath('admin') . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'plugin' . DIRECTORY_SEPARATOR . $this->plugin . DIRECTORY_SEPARATOR;
         if (!is_dir($sourcePath)) {
             return true;
         }
@@ -349,7 +351,7 @@ final class PluginBuildService extends PluginBaseService
      */
     public function packageWeb(): true
     {
-        $sourcePath = $this->getFrontendProjectPath('web') . DIRECTORY_SEPARATOR . 'addon' . DIRECTORY_SEPARATOR . $this->plugin . DIRECTORY_SEPARATOR;
+        $sourcePath = PluginPath::templateProjectPath('web') . DIRECTORY_SEPARATOR . 'app' . DIRECTORY_SEPARATOR . 'plugin' . DIRECTORY_SEPARATOR . $this->plugin . DIRECTORY_SEPARATOR;
         if (!is_dir($sourcePath)) {
             return true;
         }
@@ -393,20 +395,9 @@ final class PluginBuildService extends PluginBaseService
      */
     private function cleanupAndPreparePackage(): void
     {
-        $runtimePath = runtime_path() . $this->plugin . DIRECTORY_SEPARATOR;
-        $pluginRuntimePath = $runtimePath . $this->plugin;
-
-        // 先拷贝
-        copy_directory($this->pluginPath, $pluginRuntimePath);
-
-        // 清理和准备ZIP文件
-        $zipFile = runtime_path() . $this->plugin . '.zip';
-        if (file_exists($zipFile)) {
-            unlink($zipFile);
-        }
-
-        // 清理临时目录
-        remove_directory($runtimePath, true);
+        // TODO: 当前方法体为空，打包流程扩展到需要临时目录时可在此实现
+        // 预期用途：拷贝插件文件到临时目录 → 创建 zip 包 → 清理临时文件
+        return;
     }
 
     /**

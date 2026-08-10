@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -9,11 +11,10 @@
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 namespace app\service\core\plugin;
 
-use core\exception\handler\PluginException;
-use core\tool\Util;
+use core\foundation\exception\handler\PluginException;
+use core\foundation\tool\Util;
 use ZipArchive;
 use GuzzleHttp\Client;
 
@@ -27,6 +28,35 @@ final class PluginDownloadService extends PluginBaseService
     public function __construct()
     {
         parent::__construct();
+    }
+
+    /**
+     * 获取下载信息
+     *
+     * @param string $pluginCode 插件编码
+     * @return array 下载信息
+     */
+    public function getDownloadInfo(string $pluginCode): array
+    {
+        $pluginDir = $this->plugin_path . DIRECTORY_SEPARATOR . $pluginCode;
+
+        // 本地已存在直接返回
+        if (is_dir($pluginDir)) {
+            $config = $this->getPluginConfig($pluginCode);
+            return [
+                'plugin_code' => $pluginCode,
+                'source'      => 'local',
+                'version'     => $config['version'] ?? '1.0.0',
+                'downloaded'  => true,
+            ];
+        }
+
+        // 本地不存在时返回本地信息，实际下载由安装流程处理
+        return [
+            'plugin_code' => $pluginCode,
+            'source'      => 'remote',
+            'downloaded'  => false,
+        ];
     }
 
     /**
@@ -136,7 +166,7 @@ final class PluginDownloadService extends PluginBaseService
     {
         $client = new Client([
             'timeout' => 300, // 下载大文件设置更长的超时时间
-            'verify'  => false,
+            'verify'  => config('madong.market_verify_ssl', true),
         ]);
 
         $response = $client->get($url, ['sink' => $file]);
@@ -268,16 +298,19 @@ final class PluginDownloadService extends PluginBaseService
      */
     private function getUnzipCmd(string $zipFile, string $extractTo): ?string
     {
+        $safeZip = escapeshellarg($zipFile);
+        $safeExtract = escapeshellarg($extractTo);
+
         if ($cmd = $this->findCmd('unzip')) {
-            return "{$cmd} -o -qq {$zipFile} -d {$extractTo}";
+            return escapeshellcmd($cmd) . " -o -qq {$safeZip} -d {$safeExtract}";
         }
 
         if ($cmd = $this->findCmd('7z')) {
-            return "{$cmd} x -bb0 -y {$zipFile} -o{$extractTo}";
+            return escapeshellcmd($cmd) . " x -bb0 -y {$safeZip} -o{$safeExtract}";
         }
 
         if ($cmd = $this->findCmd('7zz')) {
-            return "{$cmd} x -bb0 -y {$zipFile} -o{$extractTo}";
+            return escapeshellcmd($cmd) . " x -bb0 -y {$safeZip} -o{$safeExtract}";
         }
 
         return null;

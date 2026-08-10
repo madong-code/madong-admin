@@ -38,7 +38,7 @@ Route::group('/api', function () {
                     new OA\SecurityScheme([
                         'securityScheme' => 'api_key',
                         'type'           => 'apiKey',
-                        'name'           => config('core.jwt.app.token_name', 'Authorization'),
+                        'name'           => config('madong.jwt.app.token_name', 'Authorization'),
                         'in'             => 'header',
                     ]),
                 ];
@@ -77,7 +77,7 @@ Route::group('/adminapi', function () {
                     new OA\SecurityScheme([
                         'securityScheme' => 'api_key',
                         'type'           => 'apiKey',
-                        'name'           => config('core.jwt.app.token_name', 'Authorization'),
+                        'name'           => config('madong.jwt.app.token_name', 'Authorization'),
                         'in'             => 'header',
                     ]),
                 ];

@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -14,8 +15,8 @@ declare(strict_types=1);
 namespace app\api\controller\site;
 
 use app\api\controller\Base;
-use app\service\api\web\LinkService;
-use core\tool\Json;
+use app\service\api\site\LinkService;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
 use OpenApi\Attributes as OA;

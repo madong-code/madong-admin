@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -16,7 +17,7 @@ namespace app\service\admin\member;
 use app\dao\web\MenuDao;
 use app\dao\member\MemberDao;
 use app\service\admin\web\MenuService as SiteMenuService;
-use core\base\BaseService;
+use core\foundation\base\BaseService;
 use Illuminate\Database\Eloquent\Collection;
 use support\Container;
 

@@ -7,7 +7,7 @@ namespace plugin\{{pluginName}}\app\adminapi\controller;
 
 use app\adminapi\middleware\OperationMiddleware;
 use app\adminapi\middleware\PermissionMiddleware;
-use core\tool\Json;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\DataResponse;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\Permission;
@@ -18,7 +18,7 @@ use support\Request;
 use support\Response;
 
 #[Middleware(OperationMiddleware::class, PermissionMiddleware::class)]
-class {{camelPluginName}}Controller
+final class {{camelPluginName}}Controller
 {
     #[OA\Get(
         path: '/{{pluginKey}}/index',

@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -15,6 +16,7 @@ namespace app\command\plugin;
 
 use app\command\BaseCommand;
 use app\service\core\plugin\PluginInstallService;
+use support\Container;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -63,8 +65,8 @@ class InstallCommand extends BaseCommand
         $io->info("Install mode: {$mode}");
 
         try {
-            // 创建安装服务实例
-            $installService = new PluginInstallService();
+            // 通过容器获取安装服务实例
+            $installService = Container::get(PluginInstallService::class);
 
             // 执行安装流程（使用基类的流式处理）
             return $this->executeStream($installService->install($name, $mode), $io, $name);

@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -22,7 +23,7 @@ use app\api\CurrentMember;
 use app\schema\request\BatchDeleteRequest;
 use app\schema\request\IdRequest;
 use app\service\admin\member\MemberService;
-use core\tool\Json;
+use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\Permission;
 use OpenApi\Attributes as OA;

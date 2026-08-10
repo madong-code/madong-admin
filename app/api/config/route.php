@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * This file is part of webman.
  * Licensed under The MIT License
@@ -33,7 +35,7 @@ Route::group('/api', function () {
                     new OA\Server(
                         [
                             'url'         => '/api',
-                            'description' => request()->host(),
+                            'description' => 'API Server',
                         ]
                     ),
                 ];
@@ -45,7 +47,7 @@ Route::group('/api', function () {
                     new OA\SecurityScheme([
                         'securityScheme' => 'api_key',
                         'type'           => 'apiKey',
-                        'name'           => config('core.jwt.app.token_name', 'Authorization'),
+                        'name'           => config('core.security.jwt.token_name', 'Authorization'),
                         'in'             => 'header',
                     ]),
                 ];

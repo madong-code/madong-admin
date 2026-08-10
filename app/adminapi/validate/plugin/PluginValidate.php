@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -14,7 +15,7 @@ declare(strict_types=1);
 namespace app\adminapi\validate\plugin;
 
 use app\model\plugin\Plugin;
-use core\base\BaseValidate;
+use core\foundation\base\BaseValidate;
 use Illuminate\Validation\Rule;
 
 /**
@@ -30,7 +31,7 @@ class PluginValidate extends BaseValidate
      *
      * @var array
      */
-    protected array $scene = [
+    protected array $scenes = [
         'store'  => [
             'author',
             'version',
@@ -40,6 +41,9 @@ class PluginValidate extends BaseValidate
             'title',
             'icon',
             'type',
+            'category_id',
+            'tags',
+            'price',
         ],
         'update' => [
             'author',
@@ -50,6 +54,21 @@ class PluginValidate extends BaseValidate
             'icon',
             'type',
             'id',
+            'category_id',
+            'tags',
+            'price',
+        ],
+        'market.store' => [
+            'key',
+            'title',
+            'version',
+            'category_id',
+        ],
+        'market.update' => [
+            'key',
+            'title',
+            'version',
+            'category_id',
         ],
     ];
 
@@ -77,6 +96,9 @@ class PluginValidate extends BaseValidate
             'type'         => 'required|string',
             'created_at'   => 'integer',
             'variables'    => 'string',
+            'category_id'  => 'string|max:50',
+            'tags'         => 'string|max:255',
+            'price'        => 'numeric|min:0',
         ];
     }
 
@@ -101,8 +123,8 @@ class PluginValidate extends BaseValidate
             'key.string'            => '插件标识必须是字符串',
             'key.unique'            => '插件Key已被占用',
             'desc.string'           => '插件描述必须是字符串',
-            'support_app.required'  => '插件支持的应用空表示通用插件必须填写',
-            'support_app.string'    => '插件支持的应用空表示通用插件必须是字符串',
+            'support_app.required'  => '插件支持的应用必须填写',
+            'support_app.string'    => '插件支持的应用必须是字符串',
             'installed_at.required' => '安装时间必须填写',
             'installed_at.integer'  => '安装时间必须是整数',
             'title.required'        => '插件名称必须填写',
@@ -111,10 +133,16 @@ class PluginValidate extends BaseValidate
             'icon.string'           => '插件图标必须是字符串',
             'status.required'       => '状态必须填写',
             'status.integer'        => '状态必须是整数',
-            'type.required'         => '插件类型app，plugin必须填写',
-            'type.string'           => '插件类型app，plugin必须是字符串',
+            'type.required'         => '插件类型必须填写',
+            'type.string'           => '插件类型必须是字符串',
             'created_at.integer'    => '创建时间必须是整数',
             'variables.string'      => '必须是字符串',
+            'category_id.string'    => '分类ID必须是字符串',
+            'category_id.max'       => '分类ID不能超过50个字符',
+            'tags.string'           => '标签必须是字符串',
+            'tags.max'              => '标签不能超过255个字符',
+            'price.numeric'         => '价格必须是数字',
+            'price.min'             => '价格不能小于0',
         ];
     }
 }

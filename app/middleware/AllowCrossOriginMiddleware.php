@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -12,18 +13,6 @@ declare(strict_types=1);
  */
 
 namespace app\middleware;
-
-
-/**
- *+------------------
- * madong
- *+------------------
- * Copyright (c) https://gitee.com/motion-code  All rights reserved.
- *+------------------
- * Author: Mr. April (405784684@qq.com)
- *+------------------
- * Official Website: http://www.madong.tech
- */
 
 use Webman\Http\Request;
 use Webman\Http\Response;

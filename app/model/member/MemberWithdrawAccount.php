@@ -1,11 +1,21 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\model\member;
 
 use app\enum\common\EnabledStatus;
 use app\enum\member\WithdrawAccountType;
-use core\base\BaseModel;
+use core\foundation\base\BaseModel;
 
 /**
  * 会员提现账号模型
@@ -38,6 +48,11 @@ class MemberWithdrawAccount extends BaseModel
         'created_at',
         'updated_at',
         'deleted_at',
+    ];
+
+    protected $casts = [
+        'id'        => 'string',
+        'member_id' => 'string',
     ];
 
     /**

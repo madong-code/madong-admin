@@ -1,9 +1,19 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\dao\member;
 
-use core\base\BaseDao;
+use core\foundation\base\BaseDao;
 use app\model\member\MemberTagRelation;
 
 /**
@@ -214,6 +224,5 @@ class MemberTagRelationDao extends BaseDao
 //    {
 //        return $this->count(['tag_id' => $tagId]);
 //    }
-
 
 }

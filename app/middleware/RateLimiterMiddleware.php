@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  *+------------------
  * madong
@@ -9,12 +11,11 @@
  *+------------------
  * Official Website: http://www.madong.tech
  */
-
 namespace app\middleware;
 
-use app\service\admin\gateway\RetaLimiterService;
-use app\service\admin\gateway\RetaRestrictionsService;
-use core\cache\CacheService;
+use app\service\admin\ops\gateway\RetaLimiterService;
+use app\service\admin\ops\gateway\RetaRestrictionsService;
+use core\infrastructure\cache\CacheService;
 use support\Container;
 use Webman\Http\Request;
 use Webman\Http\Response;

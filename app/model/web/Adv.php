@@ -1,15 +1,27 @@
 <?php
 declare(strict_types=1);
 
+/**
+ *+------------------
+ * madong
+ *+------------------
+ * Copyright (c) https://gitee.com/motion-code  All rights reserved.
+ *+------------------
+ * Author: Mr. April (405784684@qq.com)
+ *+------------------
+ * Official Website: http://www.madong.tech
+ */
 namespace app\model\web;
 
-use core\base\BaseModel;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use core\foundation\base\BaseModel;
 
 /**
  * 广告模型
  */
 class Adv extends BaseModel
 {
+    use SoftDeletes;
     /**
      * 数据表名称
      */
@@ -36,6 +48,10 @@ class Adv extends BaseModel
         'created_at',
         'updated_at',
         'deleted_at',
+    ];
+
+    protected $casts = [
+        'id'        => 'string',
     ];
 
     /**

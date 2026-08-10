@@ -1,27 +1,27 @@
 <?php
 
-return [
-    'name'        => '{{pluginName}}',
-    'title'       => '{{pluginTitle}}',
-    'type'        => 'madong',
-    'description' => '{{pluginDescription}}',
-    'author'      => 'Your Name',
-    'email'       => 'your.email@example.com',
-    'version'     => '1.0.0',
-    // Composer 依赖
-    'require'      => [
-        'composer' => [],
-    ],
-    // NPM 依赖
-    'npm_require'  => [
-        'admin' => [],
-        'web'   => [],
-    ],
+/**
+ * 插件信息配置
+ */
 
-    // 卸载配置
+return [
+    'name'         => '{{pluginName}}',
+    'identifier'   => '{{pluginName}}',
+    'key'          => '{{pluginName}}',
+    'title'        => '{{pluginTitle}}',
+    'description'  => '{{pluginDescription}}',
+    'desc'         => '{{pluginDescription}}',
+    'author'       => 'Your Name',
+    'author_email' => '',
+    'version'      => '1.0.0',
+    'type'         => 'madong:app',
+    'website'      => '',
+    'icon'         => '',
+    'cover'        => '',
+    'support_app'  => '',
+    'status'       => 1,
     'uninstall'    => [
-        'undeletable'         => false,  // 是否不可删除（true: 系统内置插件不可删除, false: 可删除）
-        'drop_tables'         => true,  // 删除数据表
-        'remove_dependencies' => false,  // 移除合并的依赖
+        'drop_tables'         => false,
+        'remove_dependencies' => false,
     ],
 ];
