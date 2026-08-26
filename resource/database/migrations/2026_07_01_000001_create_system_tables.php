@@ -360,6 +360,7 @@ return new class {
                 $table->string('redirect', 255)->nullable()->comment('重定向');
                 $table->string('icon', 64)->nullable()->comment('菜单图标');
                 $table->tinyInteger('is_show')->default(1)->comment('是否显示: 0否 1是');
+                $table->tinyInteger('is_tab')->default(1)->comment('是否显示在tags标签: 0否 1是');
                 $table->tinyInteger('is_link')->default(0)->comment('是否外链: 0否 1是');
                 $table->longText('link_url')->nullable()->comment('外部链接地址');
                 $table->tinyInteger('enabled')->default(1)->comment('状态: 1正常 0停用');
