@@ -102,6 +102,22 @@ class MenuFormattingListener extends BaseListener
                 'openInNewWindow' => $item->open_type === '_blank',            // 修复：移除错误的三元运算符
             ];
 
+            // ⭐ 插件菜单「自动」注入 module 标识：
+            // module 取自 source 字段（如 source='plugin:logviewer' → module='logviewer'），
+            // 与 app 字段（应用标识，如 admin/web）解耦——app 不再承担模块名职责。
+            // 前端据此自动拼成 /plugins/{module}/views/{component} 视图路径，
+            // 无需在 menu/admin.php 里手写 module 或 /plugin/ 前缀。
+            $module = '';
+            if (str_starts_with($item->source ?? '', 'plugin:')) {
+                $module = substr($item->source, strlen('plugin:'));
+            } elseif (str_starts_with($item->component ?? '', '/plugin/')) {
+                $segs   = explode('/', trim($item->component, '/'));
+                $module = $segs[1] ?? '';
+            }
+            if (!empty($module)) {
+                $result['meta']['module'] = $module;
+            }
+
             return $result;
         })->toArray();
         $tree         = new Tree($filteredData);
@@ -153,9 +169,13 @@ class MenuFormattingListener extends BaseListener
                     'roles'        => $item->variable ? explode(',', $item->variable) : [], // 假设variable存储角色列表（逗号分隔）
                 ];
 
-                // 插件菜单添加 module 字段，值为 app 字段
-                if (str_starts_with($item->source ?? '', 'plugin:') && !empty($item->app)) {
-                    $meta['module'] = $item->app;
+                // 插件菜单自动添加 module 字段（与 formatForVben 保持一致：从 source 提取）
+                $artModule = '';
+                if (str_starts_with($item->source ?? '', 'plugin:')) {
+                    $artModule = substr($item->source, strlen('plugin:'));
+                }
+                if (!empty($artModule)) {
+                    $meta['module'] = $artModule;
                 }
 
                 $component = $item->component;

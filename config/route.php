@@ -26,6 +26,11 @@ require_once app_path('adminapi/config/route.php');
  */
 require_once app_path('api/config/route.php');
 
+/**
+ * 业务插件路由（workflow 等）
+ */
+require_once base_path('plugin/workflow/config/route.php');
+
 // 安装页面
 Route::get('/install', function () {
     $file = public_path() . '/install/index.html';

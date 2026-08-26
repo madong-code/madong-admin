@@ -171,4 +171,51 @@ final class DeptController extends Crud
         return parent::show($request);
     }
 
+    #[OA\Get(
+        path: '/system/dept/tree',
+        summary: '部门树（选择器用）',
+        tags: ['部门管理'],
+    )]
+    #[Permission(code: 'org:dept:list')]
+    #[SimpleResponse(example: '{"code":0,"msg":"success","data":[]}')]
+    public function tree(Request $request): \support\Response
+    {
+        try {
+            $depts = \app\model\system\org\Dept::query()
+                ->where('enabled', 1)
+                ->whereNull('deleted_at')
+                ->orderBy('sort', 'asc')
+                ->orderBy('id', 'asc')
+                ->get(['id', 'pid', 'name', 'sort'])
+                ->toArray();
+
+            return Json::success('ok', $this->buildDeptTree($depts, '0'));
+        } catch (\Throwable $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    /**
+     * 组装部门树
+     */
+    private function buildDeptTree(array $items, string $parentId = '0'): array
+    {
+        $tree = [];
+        foreach ($items as $item) {
+            if ((string) $item['pid'] === $parentId) {
+                $node = [
+                    'id'   => (string) $item['id'],
+                    'pid'  => (string) $item['pid'],
+                    'name' => $item['name'],
+                ];
+                $children = $this->buildDeptTree($items, (string) $item['id']);
+                if (!empty($children)) {
+                    $node['children'] = $children;
+                }
+                $tree[] = $node;
+            }
+        }
+        return $tree;
+    }
+
 }

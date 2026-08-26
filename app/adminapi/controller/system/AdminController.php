@@ -22,10 +22,13 @@ use app\adminapi\schema\request\system\AdminFormRequest;
 use app\adminapi\schema\request\system\AdminQueryRequest;
 use app\adminapi\schema\response\system\AdminResponse;
 use app\adminapi\validate\system\admin\AdminValidate;
+use app\model\system\admin\Admin;
+use app\model\system\admin\AdminDept;
 use app\schema\request\BatchDeleteRequest;
 use app\schema\request\IdRequest;
 use app\service\admin\system\admin\AdminRoleService;
 use app\service\admin\system\admin\AdminService;
+use app\service\admin\system\org\DeptService;
 use core\foundation\exception\handler\AdminException;
 use core\foundation\tool\Json;
 use madong\swagger\annotation\response\PageResponse;
@@ -401,6 +404,73 @@ final class AdminController extends Crud
             $data = $this->getDeleteIds($request);
             $this->service->batchDelete($data);
             return Json::success('ok');
+        } catch (\Throwable $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    #[OA\Get(
+        path: '/system/admin/options',
+        summary: '用户选择器列表（部门/关键词/ids）',
+        tags: ['用户管理'],
+        parameters: [
+            new OA\Parameter(name: "dept_id", description: "部门ID(含子部门)", in: "query", schema: new OA\Schema(type: "string")),
+            new OA\Parameter(name: "keywords", description: "关键词(用户名/真实姓名/手机号模糊)", in: "query", schema: new OA\Schema(type: "string")),
+            new OA\Parameter(name: "ids", description: "ID集合(逗号分隔，回显用)", in: "query", schema: new OA\Schema(type: "string")),
+            new OA\Parameter(name: "page", description: "页码", in: "query", schema: new OA\Schema(type: "integer")),
+            new OA\Parameter(name: "limit", description: "每页数量", in: "query", schema: new OA\Schema(type: "integer")),
+        ]
+    )]
+    #[Permission(code: 'system:admin:list')]
+    #[SimpleResponse(example: ['code' => 0, 'msg' => 'success', 'data' => []])]
+    public function options(Request $request): \support\Response
+    {
+        try {
+            $page  = (int) $request->input('page', 1);
+            $limit = (int) $request->input('limit', 20);
+
+            $query = Admin::query()
+                ->where('enabled', 1)
+                ->whereNull('deleted_at');
+
+            $keywords = $request->input('keywords');
+            if (!empty($keywords)) {
+                $query->where(function ($q) use ($keywords) {
+                    $q->where('user_name', 'like', '%' . $keywords . '%')
+                      ->orWhere('real_name', 'like', '%' . $keywords . '%')
+                      ->orWhere('mobile_phone', 'like', '%' . $keywords . '%');
+                });
+            }
+
+            $deptId = $request->input('dept_id');
+            if (!empty($deptId)) {
+                $deptService = Container::make(DeptService::class);
+                $deptIds     = $deptService->getChildIdsIncludingSelf((string) $deptId);
+                $adminIds    = AdminDept::whereIn('dept_id', $deptIds)->pluck('admin_id');
+                $query->whereIn('id', $adminIds);
+            }
+
+            $ids = $request->input('ids');
+            if (!empty($ids)) {
+                $ids = is_array($ids)
+                    ? $ids
+                    : array_values(array_filter(explode(',', (string) $ids)));
+                if (!empty($ids)) {
+                    $query->whereIn('id', $ids);
+                }
+            }
+
+            $total = (clone $query)->count();
+            $items = $query->orderByDesc('id')
+                ->forPage($page, $limit)
+                ->get(['id', 'user_name', 'real_name', 'nick_name', 'mobile_phone']);
+
+            // 补 label 字段供选择器展示（真实姓名优先，回退用户名）
+            foreach ($items as $item) {
+                $item->setAttribute('label', $item->real_name ?: $item->user_name);
+            }
+
+            return Json::success('ok', compact('items', 'total'));
         } catch (\Throwable $e) {
             return Json::fail($e->getMessage());
         }

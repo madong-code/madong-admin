@@ -23,7 +23,15 @@
         "wiki": "https://workerman.net/doc/webman",
         "source": "https://github.com/walkor/webman"
     },
-    "repositories": [],
+    "repositories": [
+        {
+            "type": "path",
+            "url": "./packages/*/*",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
     "require": {
         "php": ">=8.2",
         "workerman/webman-framework": "~2.2",
@@ -99,7 +107,11 @@
         },
         "files": [
             "./support/helpers.php"
+        ],
+        "classmap": [
+            "packages/"
         ]
+
     },
     "scripts": {
         "post-package-install": [

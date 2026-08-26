@@ -101,6 +101,28 @@ class PluginInstall
     }
 
     /**
+     * 设置运行上下文（在线安装通道会调用，如 setContext('default')）
+     * 兼容字符串或数组形式的上下文标识
+     */
+    protected array $context = [];
+
+    public function setContext(string|array $context): self
+    {
+        $this->context = is_array($context) ? $context : ['mode' => $context];
+        return $this;
+    }
+
+    public function getContext(): array
+    {
+        return $this->context;
+    }
+
+    public function hasContext(): bool
+    {
+        return !empty($this->context);
+    }
+
+    /**
      * 获取执行日志文件路径
      */
     protected function getExecutionLogFile(string $action): string

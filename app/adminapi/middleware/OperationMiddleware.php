@@ -116,6 +116,7 @@ final class OperationMiddleware implements MiddlewareInterface
 
     private function getBrowser($user_agent): string
     {
+        $user_agent = (string) ($user_agent ?? '');
         $br = 'Unknown';
         if (preg_match('/MSIE/i', $user_agent)) {
             $br = 'MSIE';
@@ -135,6 +136,7 @@ final class OperationMiddleware implements MiddlewareInterface
 
     private function getOs($user_agent): string
     {
+        $user_agent = (string) ($user_agent ?? '');
         $os = 'Unknown';
         if (preg_match('/win/i', $user_agent)) {
             $os = 'Windows';
@@ -161,6 +163,17 @@ final class OperationMiddleware implements MiddlewareInterface
 
     private function formatResponse(Response $response): array|string
     {
+        // 文件下载（流式响应）不读取 body，避免大文件被整体读入内存并破坏流式输出
+        $contentType = (string) $response->getHeader('content-type');
+        $contentDisposition = (string) $response->getHeader('content-disposition');
+        if (
+            str_contains($contentType, 'application/octet-stream')
+            || str_contains($contentType, 'application/force-download')
+            || str_contains($contentDisposition, 'attachment')
+        ) {
+            return '[文件下载]';
+        }
+
         $rawBody = $response->rawBody();
         if (str_contains($rawBody, 'json')) {
             return json_decode($rawBody, true) ?? $rawBody;
