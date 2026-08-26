@@ -71,11 +71,11 @@ class MenuFormattingListener extends BaseListener
                 'query'         => null,           // 预留字段：路由参数
             ];
 
-            // 徽章配置（直接放在根级别，前端组件直接读取）
+            // 徽章配置（snake_case 输出，前端统一映射）
             if (!empty($item->show_text_badge)) {
-                $result['badge']         = $item->show_text_badge;
-                $result['badgeType']     = 'normal';
-                $result['badgeVariants'] = 'default';
+                $result['badge']          = $item->show_text_badge;
+                $result['badge_type']     = 'normal';
+                $result['badge_variants'] = 'default';
             }
 
             // meta 字段（用于路由配置）
@@ -87,7 +87,7 @@ class MenuFormattingListener extends BaseListener
 
                 // 显示控制
                 'hideInMenu'      => !$item->is_show ?? false,
-                'hideInTab'       => $item->is_hide_tab ?? false,
+                'hideInTab'       => !($item->is_tab ?? true),
                 'affixTab'        => $item->is_affix ?? false, // 固定标签页
 
                 // 权限控制

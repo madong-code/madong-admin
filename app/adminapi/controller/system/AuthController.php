@@ -16,6 +16,7 @@ namespace app\adminapi\controller\system;
 
 use app\adminapi\controller\Crud;
 use app\adminapi\CurrentUser;
+use app\adminapi\event\system\MenuBadgeDecorateEvent;
 use app\adminapi\event\system\MenuFormattingEvent;
 use app\adminapi\middleware\AccessTokenMiddleware;
 use app\adminapi\middleware\OperationMiddleware;
@@ -101,7 +102,12 @@ final class AuthController extends Crud
             $collection = $this->service->getMenusByUserRoles($currUser, true);
             $event      = new MenuFormattingEvent($collection, $format);
             $data       = $event->dispatch();
-            return Json::success('ok', $data);
+
+            // 触发徽标装饰事件：供下游监听器追加业务徽标
+            $badgeEvent = new MenuBadgeDecorateEvent($data, $currUser->id(), 'admin');
+            $badgeEvent->dispatch();
+
+            return Json::success('ok', $badgeEvent->menus);
         } catch (\Throwable $e) {
             return Json::fail($e->getMessage(), [], $e->getCode());
         }

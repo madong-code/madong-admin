@@ -63,6 +63,7 @@ class MigrateAdminMenuCommand extends BaseCommand
         'redirect',
         'icon',
         'is_show',
+        'is_tab',
         'is_link',
         'link_url',
         'enabled',
@@ -328,6 +329,7 @@ class MigrateAdminMenuCommand extends BaseCommand
         $model->redirect  = $menu['redirect'] ?? '';
         $model->icon      = $menu['icon'] ?? '';
         $model->is_show   = $menu['is_show'] ?? 1;
+        $model->is_tab    = $menu['is_tab'] ?? 1;
         $model->is_link   = $menu['is_link'] ?? 0;
         $model->link_url  = $menu['link_url'] ?? null;
         $model->enabled   = $menu['enabled'] ?? 1;
