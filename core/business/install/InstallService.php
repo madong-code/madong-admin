@@ -1359,7 +1359,7 @@ final class InstallService
             // 5. 运行种子数据 (40-50%)
             yield from $this->runAllSeeders($dbParams, $adminParams, $sessionUuid);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             throw new Exception('数据库安装失败: ' . $e->getMessage());
         }
     }
@@ -1400,10 +1400,13 @@ final class InstallService
                 $dbParams['password'],
                 [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]
             );
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             yield Sse::progress('⚠️ PDO 连接失败: ' . $e->getMessage(), 33, [], $sessionUuid);
             return;
         }
+
+        // 提前创建一次 Schema Builder，避免循环中反复 bootEloquent/setAsGlobal 污染 PHP 内部状态
+        $schema = $this->createSchemaBuilder($pdo, $dbParams['prefix'] ?? 'ma_', $dbParams['database'] ?? 'madong');
 
         $total = count($files);
         $current = 0;
@@ -1418,13 +1421,18 @@ final class InstallService
                 // 加载迁移文件
                 $migrationClass = require $file;
                 
+                // PHP 8.4+ method_exists 严格要求 object|string，需先做类型防护
+                if (!is_object($migrationClass)) {
+                    yield Sse::progress("⚠️ 迁移文件格式错误 {$basename}: require 返回 " . gettype($migrationClass) . "（预期匿名类实例）", (int)$progress, [], $sessionUuid);
+                    error_log("Migration type error in {$basename}: require returned " . gettype($migrationClass) . " instead of object. File may lack 'return new class'.");
+                    continue;
+                }
+                
                 // 捕获 echo 输出
                 ob_start();
                 
                 // 执行迁移的 up 方法
                 if (method_exists($migrationClass, 'up')) {
-                    // 获取 Schema Builder
-                    $schema = $this->createSchemaBuilder($pdo, $dbParams['prefix'] ?? 'ma_', $dbParams['database'] ?? 'madong');
                     $migrationClass->up($schema);
                 }
                 
@@ -1437,7 +1445,7 @@ final class InstallService
                 }
                 
                 yield Sse::progress("> 迁移: {$basename}", (int)$progress, [], $sessionUuid);
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 ob_end_clean(); // 清理捕获的输出
                 yield Sse::progress("⚠️ 迁移失败 {$basename}: " . $e->getMessage(), (int)$progress, [], $sessionUuid);
                 // 记录详细错误日志
