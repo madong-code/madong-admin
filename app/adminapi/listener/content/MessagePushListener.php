@@ -25,19 +25,12 @@ class MessagePushListener extends BaseListener
 
     protected function process($event): void
     {
-        Logger::info('消息推送事件', [
-            'scene'  => $event->scene,
-            'module' => $event->businessModule,
-            'count'  => is_array($event->userIds) ? count($event->userIds) : 1,
-        ]);
-
         try {
             if ($event->isForce) {
                 $notificationService = $this->getNotificationService();
                 $result = $notificationService->sendAndRecord(
                     $event->clientType,
                     $event->businessModule,
-                    null,
                     $event->userIds,
                     $event->event,
                     $event->data,
@@ -46,10 +39,9 @@ class MessagePushListener extends BaseListener
                 );
             } else {
                 $notifyService = $this->getNotifyService();
-                $result  = $notifyService->send(
+                $result = $notifyService->send(
                     $event->clientType,
                     $event->businessModule,
-                    null,
                     $event->userIds,
                     $event->event,
                     $event->data,
