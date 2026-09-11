@@ -31,6 +31,10 @@ HANDOVER.md
 check-messages.php
 insert-test-message.php
 
+# 测试骨架占位（仅保留 Bootstrap.php）
+/tests/integration/
+/tests/saas/
+
 
 
 
