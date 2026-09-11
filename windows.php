@@ -3,14 +3,14 @@
  * Start file for windows
  */
 chdir(__DIR__);
+// 在 autoload 之前设置，避免 vendor 包在自动加载阶段触发 Deprecated 刷屏
+ini_set('display_errors', 'on');
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 require_once __DIR__ . '/vendor/autoload.php';
 
 use Dotenv\Dotenv;
 use support\App;
 use Workerman\Worker;
-
-ini_set('display_errors', 'on');
-error_reporting(E_ALL);
 
 if (class_exists('Dotenv\Dotenv') && file_exists(base_path() . '/.env')) {
     if (method_exists('Dotenv\Dotenv', 'createUnsafeImmutable')) {
@@ -67,15 +67,15 @@ function write_process_file($runtimeProcessPath, $processName, $firm): string
     $configParam = $firm ? "config('plugin.$firm.process')['$processName']" : "config('process')['$processName']";
     $fileContent = <<<EOF
 <?php
+// 在 autoload 之前设置，避免 vendor 包在自动加载阶段触发 Deprecated 刷屏
+ini_set('display_errors', 'on');
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 require_once __DIR__ . '/../../vendor/autoload.php';
 
 use Workerman\Worker;
 use Workerman\Connection\TcpConnection;
 use Webman\Config;
 use support\App;
-
-ini_set('display_errors', 'on');
-error_reporting(E_ALL);
 
 if (is_callable('opcache_reset')) {
     opcache_reset();
@@ -87,6 +87,10 @@ if (!\$appConfigFile = config_path('app.php')) {
 \$appConfig = require \$appConfigFile;
 if (\$timezone = \$appConfig['default_timezone'] ?? '') {
     date_default_timezone_set(\$timezone);
+}
+
+if (isset(\$appConfig['error_reporting'])) {
+    error_reporting(\$appConfig['error_reporting']);
 }
 
 App::loadAllConfig(['route']);
