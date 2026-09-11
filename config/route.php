@@ -203,6 +203,12 @@ Route::get('/favicon.ico', function () {
 });
 
 /**
+ * MCP 端点路由（core/communication 域）
+ * 必须在 Route::disableDefaultRoute() 之前注册；固定路径 /mcp，不挂 adminapi 分组
+ */
+require_once base_path('core/communication/mcp/route.php');
+
+/**
  * 关闭默认路由
  */
 Route::disableDefaultRoute();

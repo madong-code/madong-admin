@@ -18,7 +18,7 @@ return [
     'name'                 => env('APP_NAME', 'MD-Admin'),
     'debug'                => env('APP_DEBUG', false),
     "lang"                 => \app\enum\common\LangEnum::ZhCN->value,//默认语言
-    'error_reporting'      => E_ALL,
+    'error_reporting'      => E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED,
     'default_timezone'     => 'Asia/Shanghai',
     'request_class'        => Request::class,
     'public_path'          => base_path() . DIRECTORY_SEPARATOR . 'public',
