@@ -22,6 +22,15 @@ plugin/*
 !plugin/example/
 !plugin/demo/
 
+# 独立引擎包（独立仓库管理）
+/packages/
+
+# 临时诊断脚本
+.dbg/
+HANDOVER.md
+check-messages.php
+insert-test-message.php
+
 
 
 
