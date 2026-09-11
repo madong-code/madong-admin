@@ -14,7 +14,7 @@ declare(strict_types=1);
 
 namespace app\adminapi\middleware\helper;
 
-use core\tool\Sse;
+use core\foundation\tool\Sse;
 use Webman\Http\Request;
 use Webman\Http\Response;
 
