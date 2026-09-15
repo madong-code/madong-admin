@@ -22,11 +22,12 @@ plugin/*
 !plugin/example/
 !plugin/demo/
 
-# 独立引擎包（独立仓库管理）
+# 本地包目录（引擎已改 composer VCS 安装，不随主仓库管理）
 /packages/
 
 # 临时诊断脚本
 .dbg/
+.dbg-content.json
 HANDOVER.md
 check-messages.php
 insert-test-message.php

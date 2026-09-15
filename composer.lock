@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "5076706331c6b22833f9ed530704a8f9",
+    "content-hash": "ce1ac4406a54ce3bece3822796981991",
     "packages": [
         {
             "name": "aliyuncs/oss-sdk-php",
@@ -3535,6 +3535,40 @@
                 "source": "https://github.com/madong-code/swagger/tree/v2.0.6"
             },
             "time": "2026-06-02T09:33:50+00:00"
+        },
+        {
+            "name": "madong/workflow",
+            "version": "v3.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/madong-code/workflow-engine.git",
+                "reference": "6ae0d805330a6226a70d339d48675cd38eda9852"
+            },
+            "require": {
+                "madong/helper": "^1.0",
+                "monolog/monolog": "^2.0|^3.0",
+                "php": "^8.1",
+                "php-di/php-di": "^7.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^10.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "madong\\workflow\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "madong\\workflow\\tests\\": "tests/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "PHP 8.1+ workflow engine - parse designer JSON definitions and drive process execution",
+            "time": "2026-09-14T13:37:35+00:00"
         },
         {
             "name": "maennchen/zipstream-php",
