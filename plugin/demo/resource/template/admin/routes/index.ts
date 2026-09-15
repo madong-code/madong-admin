@@ -1,4 +1,4 @@
-import type { RouteRecordStringComponent } from '@vben/types';
+import type { RouteRecordStringComponent } from '#/core/shared/types';
 
 import { $t } from '#/locales';
 
@@ -285,6 +285,19 @@ const routes: PluginRoute[] = [
               module: 'demo',
             },
           },
+          // 可视化流程设计器（visual-flow）
+          {
+            path: '/demo/widgets/visual-flow',
+            name: 'DemoVisualFlow',
+            component: 'widgets/visual-flow/index',
+            meta: {
+              title: $t('demo.widgets.visual-flow.menu'),
+              icon: 'lucide:workflow',
+              keepAlive: true,
+              module: 'demo',
+            },
+          },
+
           // 图片选择器
           {
             path: '/demo/widgets/image-selector',
