@@ -56,7 +56,7 @@
         "laravel/serializable-closure": "^2.0",
         "psr/container": "1.1.1",
         "madong/helper": "^1.1",
-        "madong/workflow": "^3.0",
+        "madong/workflow": "*",
         "workerman/workerman": "~5.1",
         "workerman/http-client": "2.1.0",
         "webman/push": "^1.0",
