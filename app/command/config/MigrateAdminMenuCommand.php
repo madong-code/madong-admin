@@ -167,11 +167,12 @@ class MigrateAdminMenuCommand extends BaseCommand
             $this->processNode($menu, 0, $inserted, $skipped, true, $updated);
         }
 
-        // Step 3: 删除文件中不存在的节点
+        // Step 3: 删除文件中不存在的节点（仅限系统菜单，插件菜单按 source 隔离，不受影响）
         $deleted = 0;
         if (!empty($fileCodes)) {
             $deleted = Menu::query()
                 ->where('app', 'admin')
+                ->where('source', 'system')
                 ->whereNotIn('code', $fileCodes)
                 ->delete();
         }
@@ -238,10 +239,11 @@ class MigrateAdminMenuCommand extends BaseCommand
         $app  = $menu['app'] ?? 'admin';
 
         if (!empty($code)) {
+            // 按 app+code 全局匹配（与删除步骤的 code 唯一性假设一致），
+            // 避免节点换父后因 pid 不同而重复插入
             $existing = Menu::query()
                 ->where('app', $app)
                 ->where('code', $code)
-                ->where('pid', (string) $pid)
                 ->first();
 
             if ($existing) {
