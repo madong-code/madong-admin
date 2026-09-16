@@ -105,6 +105,43 @@ class MetadataCollectorService
     }
     
     /**
+     * 从插件控制器文件路径解析插件名
+     * 路径形如 {base}/plugin/{name}/app/...，显示名优先取插件 config/info.php 的 name
+     *
+     * @param string $filePath
+     *
+     * @return string|null
+     */
+    private function resolvePluginName(string $filePath): ?string
+    {
+        $relative = str_replace(base_path(), '', $filePath);
+        $relative = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relative);
+        $segments = explode(DIRECTORY_SEPARATOR, ltrim($relative, DIRECTORY_SEPARATOR));
+
+        if (($segments[0] ?? '') !== 'plugin' || empty($segments[1])) {
+            return null;
+        }
+
+        // 插件目录名兜底
+        $pluginName = $segments[1];
+
+        // 优先取插件 config/info.php 中的 name
+        try {
+            $infoFile = base_path('plugin' . DIRECTORY_SEPARATOR . $pluginName . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'info.php');
+            if (is_file($infoFile)) {
+                $info = include $infoFile;
+                if (is_array($info) && isset($info['name']) && is_string($info['name']) && $info['name'] !== '') {
+                    $pluginName = $info['name'];
+                }
+            }
+        } catch (\Throwable $e) {
+            // info.php 加载失败时使用目录名
+        }
+
+        return $pluginName;
+    }
+
+    /**
      * 扫描控制器文件中的权限注解
      *
      * @param string $filePath
@@ -129,9 +166,15 @@ class MetadataCollectorService
             
             // 使用反射获取类信息
             $reflectionClass = new ReflectionClass($className);
-            
+
             // 生成路由地址
             $routePath = $this->generateRoutePath($filePath, $module);
+
+            // 插件控制器：提取插件名（plugin/{name}/...，显示名取 info.php 的 name）
+            $pluginName = null;
+            if ($module === 'plugin') {
+                $pluginName = $this->resolvePluginName($filePath);
+            }
             
             // 扫描所有方法
             $methods = $reflectionClass->getMethods(ReflectionMethod::IS_PUBLIC);
@@ -217,6 +260,7 @@ class MetadataCollectorService
                     $permission['controller'] = $reflectionClass->getShortName();
                     $permission['method'] = $method->getName();
                     $permission['module'] = $module;
+                    $permission['plugin'] = $pluginName;
                     $permission['route'] = $this->generateMethodRoute($routePath, $method->getName());
                     
                     // 合并 swagger 信息
