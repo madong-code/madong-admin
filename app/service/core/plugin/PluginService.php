@@ -114,10 +114,10 @@ final class PluginService extends PluginBaseService
             $cover = '';
             if (is_dir($publicPath)) {
                 if (file_exists($publicPath . '/icon.png')) {
-                    $icon = base64_encode(file_get_contents($publicPath . '/icon.png'));
+                    $icon = 'data:image/png;base64,' . base64_encode(file_get_contents($publicPath . '/icon.png'));
                 }
                 if (file_exists($publicPath . '/cover.png')) {
-                    $cover = base64_encode(file_get_contents($publicPath . '/cover.png'));
+                    $cover = 'data:image/png;base64,' . base64_encode(file_get_contents($publicPath . '/cover.png'));
                 }
             }
 
