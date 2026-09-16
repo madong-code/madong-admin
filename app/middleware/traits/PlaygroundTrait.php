@@ -81,9 +81,20 @@ trait PlaygroundTrait
         $methods     = config('playground.methods', ['PUT', 'POST', 'DELETE']);
         $routes      = config('playground.routes', []);
 
+        // 按路由单独指定的方法（覆盖全局 methods, 适用于 GET 类敏感操作）
+        $routeMethods = config('playground.route_methods', []);
+
         foreach ($routes as $pattern) {
             if (preg_match("#^$pattern$#", $currentPath)) {
                 if (in_array($method, $methods, true)) {
+                    throw new \RuntimeException($message);
+                }
+            }
+        }
+
+        foreach ($routeMethods as $pattern => $limitedMethods) {
+            if (preg_match("#^$pattern$#", $currentPath)) {
+                if (in_array($method, (array)$limitedMethods, true)) {
                     throw new \RuntimeException($message);
                 }
             }
