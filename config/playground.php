@@ -3,7 +3,9 @@
 /**
  * Playground（演示/沙盒）环境配置
  *
- * enable:      是否开启限制，未配置或为 false 时默认为正式环境
+ * enable:      是否开启限制，通过环境变量 PLAYGROUND_ENABLE 控制
+ *              .env 中未配置或为 false 时默认为正式环境（拦截不生效）
+ *              演示环境设置 PLAYGROUND_ENABLE=true 开启
  *
  * bypass_uids: 跳过限制的用户 ID 列表，匹配的用户可正常操作
  *              默认 [1] 仅 root 用户
@@ -22,7 +24,7 @@
  * 平台端（/platformapi）相关规则不适用于单体版，故未包含。
  */
 return [
-    'enable'      => true,
+    'enable'      => env('PLAYGROUND_ENABLE', false),
     'bypass_uids' => [1],
     'routes'  => [
         // 系统管理
