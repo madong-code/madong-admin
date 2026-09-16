@@ -114,9 +114,9 @@ class MetadataCollectorService
      */
     private function resolvePluginName(string $filePath): ?string
     {
-        $relative = str_replace(base_path(), '', $filePath);
+        $relative = $this->relativeToBase($filePath);
         $relative = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relative);
-        $segments = explode(DIRECTORY_SEPARATOR, ltrim($relative, DIRECTORY_SEPARATOR));
+        $segments = explode(DIRECTORY_SEPARATOR, $relative);
 
         if (($segments[0] ?? '') !== 'plugin' || empty($segments[1])) {
             return null;
@@ -152,8 +152,7 @@ class MetadataCollectorService
     {
         try {
             // 获取类名
-        $relativePath = str_replace(base_path(), '', $filePath);
-        $relativePath = ltrim($relativePath, DIRECTORY_SEPARATOR);
+        $relativePath = $this->relativeToBase($filePath);
         // 确保使用反斜杠作为命名空间分隔符
         $className = str_replace(['/', '\\'], '\\', $relativePath);
         $className = str_replace('.php', '', $className);
@@ -331,6 +330,25 @@ class MetadataCollectorService
     }
 
     /**
+     * 获取路径相对 base_path 的部分
+     * 只剥离一次前缀：不能用 str_replace(base_path(), '', ...) 全量替换，
+     * 否则当 base_path 恰为 '/app'（Docker 部署）时会把 '/app/app/...' 中的
+     * app 目录段也误删，导致类名解析错误、扫描结果为空
+     *
+     * @param string $path
+     *
+     * @return string
+     */
+    private function relativeToBase(string $path): string
+    {
+        $base = rtrim(base_path(), '/\\');
+        if ($base !== '' && str_starts_with($path, $base)) {
+            $path = substr($path, strlen($base));
+        }
+        return ltrim($path, '/\\');
+    }
+
+    /**
      * 生成控制器的路由路径
      *
      * @param string $filePath
@@ -343,8 +361,7 @@ class MetadataCollectorService
     {
         try {
             // 移除基础路径
-            $relativePath = str_replace(base_path(), '', $filePath);
-            $relativePath = ltrim($relativePath, DIRECTORY_SEPARATOR);
+            $relativePath = $this->relativeToBase($filePath);
             
             // 标准化分隔符
             $relativePath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
