@@ -79,6 +79,13 @@ Route::any('/admin/[{path:.+}]', function (Request $request, $path = '') {
     // 文件
     $file = "$admin_path/$path";
     if (!is_file($file)) {
+        // 对于SPA应用，如果文件不存在，返回index.html让前端路由处理
+        $index_file = "$admin_path/index.html";
+        if (is_file($index_file)) {
+            return response(file_get_contents($index_file), 200, [
+                'Content-Type' => 'text/html',
+            ]);
+        }
         return response('<h1>404 Not Found</h1>', 404);
     }
     return response('')->withFile($file);
