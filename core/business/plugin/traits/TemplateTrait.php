@@ -122,33 +122,68 @@ trait TemplateTrait
 
         $this->recurseDelete($targetDir);
 
+        if (is_dir($targetDir)) {
+            $this->output("  ⚠️ {$endpoint}: 部分模板文件被占用未能删除（可能被 dev server 监听），请手动清理: {$targetDir}");
+            return;
+        }
+
         $this->output("  ✅ {$endpoint}: Templates deleted");
     }
 
     /**
-     * 递归删除目录
+     * 递归删除目录（容错版）
+     *
+     * Windows 下 dev server（Vite watch）持有文件句柄时 unlink 会报 Permission denied，
+     * 重试等待句柄释放；仍失败的仅记录警告，不抛异常、不中断卸载流程。
      */
-    protected function recurseDelete(string $dir): void
+    protected function recurseDelete(string $dir, int $retry = 2): bool
     {
         if (!is_dir($dir)) {
-            return;
+            return true;
         }
 
-        $files = scandir($dir);
-        foreach ($files as $file) {
-            if ($file === '.' || $file === '..') {
-                continue;
+        $failed = [];
+
+        for ($attempt = 0; $attempt <= $retry; $attempt++) {
+            $failed = [];
+
+            $files = @scandir($dir);
+            if ($files === false) {
+                return false;
             }
 
-            $path = $dir . '/' . $file;
-            if (is_dir($path)) {
-                $this->recurseDelete($path);
-            } else {
-                unlink($path);
+            foreach ($files as $file) {
+                if ($file === '.' || $file === '..') {
+                    continue;
+                }
+
+                $path = $dir . '/' . $file;
+
+                if (@filetype($path) === false) {
+                    // 幽灵条目（delete-pending，lstat 失败），本轮跳过等待句柄释放
+                    $failed[] = $path;
+                    continue;
+                }
+
+                if (@is_dir($path)) {
+                    $this->recurseDelete($path, $retry) || $failed[] = $path;
+                } else {
+                    @unlink($path) || $failed[] = $path;
+                }
+            }
+
+            if (@rmdir($dir)) {
+                return true;
+            }
+
+            if ($attempt < $retry) {
+                usleep(300000);
             }
         }
 
-        rmdir($dir);
+        $this->output("  ⚠️ Delete failed (files may be locked):\n" . implode("\n", $failed));
+
+        return false;
     }
 
     /**
