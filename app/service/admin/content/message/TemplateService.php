@@ -59,6 +59,9 @@ class TemplateService extends BaseService
         // 移除非模板字段
         unset($data['definition_id']);
 
+        // 后台自建模板统一标记来源
+        $data['source'] = $data['source'] ?? 'user';
+
         $model = $this->dao->save($data);
 
         // 如果指定了消息定义，创建中间表关联
