@@ -19,7 +19,4 @@ return [
             'remove_dependencies' => false,//卸载时移除 composer/npm 依赖
             'undeletable' => false,//卸载后无法删除
         ],
-        'resource' => [
-            'menu' => 'data/menu', // 菜单文件位于 resource/data/menu/ 而非默认的 resource/menu/
-        ],
     ];

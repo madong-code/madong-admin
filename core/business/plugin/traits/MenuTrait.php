@@ -34,7 +34,7 @@ trait MenuTrait
      */
     protected function loadMenus(): void
     {
-        $menuResourceDir = $this->getConfig('resource.menu', 'menu');
+        $menuResourceDir = $this->getConfig('resource.menu', 'data/menu');
         $menuDir = $this->pluginPath . '/resource/' . $menuResourceDir;
 
         $this->output("📂 Loading menus from: {$menuDir}");

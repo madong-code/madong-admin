@@ -9,7 +9,7 @@ use core\business\plugin\PluginInstall as BasePluginInstall;
  * 系统日志查看器插件安装类
  *
  * 安装时导入：
- * - 后端菜单 (resource/menu/admin.php)      -> 导入「日志查看器」菜单与按钮权限
+ * - 后端菜单 (resource/data/menu/admin.php)  -> 导入「日志查看器」菜单与按钮权限
  * - 前端模板资源 (resource/template/admin/)  -> 复制到前端 template/admin/src/plugin/logviewer/
  *
  * 卸载时清理：

@@ -29,7 +29,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 /**
  * 插件菜单同步
  *
- * 将 plugin/{name}/resource/menu/{admin,web}.php 与数据库对齐。
+ * 将 plugin/{name}/resource/data/menu/{admin,web}.php 与数据库对齐。
+ * （菜单目录取自 config/info.php 的 resource.menu，缺省 data/menu）
  *
  * 三种模式：
  *   - 增量（默认）：仅补插文件中存在但数据库中缺失的节点，已存在节点跳过（安全、幂等）
@@ -241,12 +242,25 @@ class MigratePluginMenuCommand extends BaseCommand
      */
     private function loadPluginMenus(string $pluginName): array
     {
-        $menuDir = base_path("plugin/{$pluginName}/resource/menu");
+        $menuDir = $this->resolveMenuDir(base_path("plugin/{$pluginName}"));
 
         return [
             'admin' => $this->loadMenuFile($menuDir . '/admin.php'),
             'web'   => $this->loadMenuFile($menuDir . '/web.php'),
         ];
+    }
+
+    /**
+     * 解析插件菜单目录
+     * 优先读取 config/info.php 的 resource.menu，缺省 resource/data/menu
+     */
+    private function resolveMenuDir(string $pluginPath): string
+    {
+        $infoFile = $pluginPath . '/config/info.php';
+        $info     = is_file($infoFile) ? include $infoFile : [];
+        $menuDir  = is_array($info) ? ($info['resource']['menu'] ?? null) : null;
+
+        return $pluginPath . '/resource/' . ($menuDir ?: 'data/menu');
     }
 
     private function loadMenuFile(string $filePath): array

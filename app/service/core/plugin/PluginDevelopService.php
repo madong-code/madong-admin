@@ -149,6 +149,8 @@ class PluginDevelopService extends PluginBaseService
             $backendPath . '/resource/database/seeds',
             $backendPath . '/resource/data/menu',
             $backendPath . '/resource/data/config',
+            $backendPath . '/resource/data/message',
+            $backendPath . '/resource/data/dict',
             $backendPath . '/resource/template/admin',
             $backendPath . '/resource/template/web',
         ];

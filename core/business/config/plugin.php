@@ -58,7 +58,9 @@ return [
         // 数据库种子目录
         'seed'      => 'database/seeds',
         // 菜单资源目录
-        'menu'      => 'menu',
+        'menu'      => 'data/menu',
+        // 消息资源目录
+        'message'   => 'data/message',
         // 模板资源目录
         'template'  => 'template',
     ],

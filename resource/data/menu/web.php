@@ -13,7 +13,7 @@
 /**
  * 主应用前端菜单种子数据
  * 仅包含主应用 routes.ts 中 menu:true 的路由
- * 插件菜单由各自 resource/menu/web.php 管理
+ * 插件菜单由各自 resource/data/menu/web.php 管理
  *
  * category: 1=导航菜单(nav), 2=会员菜单(member)
  * type: 1=目录, 2=导航页, 3=外链, 4=单页
