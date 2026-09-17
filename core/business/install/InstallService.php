@@ -19,6 +19,7 @@ use core\business\install\traits\InstallDatabaseTrait;
 use core\business\install\traits\MenuTrait;
 use core\business\install\traits\DictTrait;
 use core\business\install\traits\ConfigTrait;
+use core\business\install\traits\MessageTrait;
 use core\business\install\traits\AdminTrait;
 use core\foundation\tool\Sse;
 use core\foundation\tool\Util;
@@ -36,6 +37,7 @@ final class InstallService
     use MenuTrait;
     use DictTrait;
     use ConfigTrait;
+    use MessageTrait;
     use AdminTrait;
     protected string $lock_file;
     protected ?Terminal $terminalService = null;
@@ -1586,6 +1588,10 @@ ENV;
         // 配置 48%
         yield Sse::progress("📝 导入配置", 48, [], $sessionUuid);
         $this->runConfig();
+
+        // 消息分类/定义/模板 49%
+        yield Sse::progress("📝 导入消息模板", 49, [], $sessionUuid);
+        $this->runMessage();
 
         // 管理员 50%
         yield Sse::progress("📝 创建管理员账户", 50, [], $sessionUuid);
