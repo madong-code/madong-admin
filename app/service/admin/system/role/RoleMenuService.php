@@ -156,12 +156,8 @@ class RoleMenuService extends BaseService
     private function clearUserPermissionCacheByRole(string|int $roleId): void
     {
         try {
-            // 获取拥有此角色的所有用户
-            /** @var \app\service\admin\system\AdminRoleService $adminRoleService */
-            $adminRoleService = Container::make(\app\service\admin\system\AdminRoleService::class);
-            
             // 获取拥有此角色的用户ID列表
-            $userIds = \app\model\system\AdminRole::where('role_id', $roleId)
+            $userIds = \app\model\system\admin\AdminRole::where('role_id', $roleId)
                 ->pluck('admin_id')
                 ->toArray();
             

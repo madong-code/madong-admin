@@ -16,6 +16,7 @@ namespace app\service\admin\system\role;
 
 use app\dao\system\role\RoleDao;
 use app\model\system\role\Role;
+use app\service\admin\system\admin\AdminRoleService;
 use core\foundation\base\BaseService;
 use core\foundation\exception\handler\AdminException;
 use madong\helper\Arr;

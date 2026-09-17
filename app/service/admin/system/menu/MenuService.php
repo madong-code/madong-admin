@@ -167,9 +167,7 @@ class MenuService extends BaseService
             }
 
             foreach ($roleIds as $roleId) {
-                $adminRoleService = Container::make(\app\service\admin\system\AdminRoleService::class);
-                
-                $userIds = \app\model\system\AdminRole::where('role_id', $roleId)
+                $userIds = \app\model\system\admin\AdminRole::where('role_id', $roleId)
                     ->pluck('admin_id')
                     ->toArray();
                 
@@ -203,7 +201,7 @@ class MenuService extends BaseService
                 ->toArray();
             
             if (!empty($roleIds)) {
-                $userIds = \app\model\system\AdminRole::whereIn('role_id', $roleIds)
+                $userIds = \app\model\system\admin\AdminRole::whereIn('role_id', $roleIds)
                     ->pluck('admin_id')
                     ->unique()
                     ->toArray();
@@ -216,7 +214,7 @@ class MenuService extends BaseService
                 }
             }
         } catch (\Throwable $e) {
-            \core\logger\Logger::error("清理菜单相关用户权限缓存失败: " . $e->getMessage());
+            \core\infrastructure\logger\Logger::error("清理菜单相关用户权限缓存失败: " . $e->getMessage());
         }
     }
 }
