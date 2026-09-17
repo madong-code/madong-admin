@@ -416,7 +416,7 @@ class MigratePluginMenuCommand extends BaseCommand
     /**
      * 同步 admin 菜单
      *
-     * @return array{0: int, 1: int, 2?: int} [inserted, skipped, updated]
+     * @return array{0: int, 1: int, 2?: int} [inserted, updated, skipped]
      */
     private function syncAdminMenus(array $menus, string $source, bool $doUpdate, bool $isFull = false): array
     {
@@ -428,7 +428,7 @@ class MigratePluginMenuCommand extends BaseCommand
             $this->processAdminNode($menu, $source, 0, $inserted, $skipped, $doUpdate, $updated, $isFull);
         }
 
-        return $doUpdate ? [$inserted, $skipped, $updated] : [$inserted, $skipped];
+        return $doUpdate ? [$inserted, $updated, $skipped] : [$inserted, $skipped];
     }
 
     /**
@@ -445,7 +445,6 @@ class MigratePluginMenuCommand extends BaseCommand
         bool $isFull = false
     ): ?string {
         $code = $menu['code'] ?? '';
-        $app = $menu['app'] ?? 'admin';
 
         // pid_code 解析
         if ($pid === 0 && !empty($menu['pid_code'])) {
@@ -453,9 +452,9 @@ class MigratePluginMenuCommand extends BaseCommand
         }
 
         if (!$isFull && !empty($code)) {
+            // 按 source+code+pid 匹配，不限定 app：历史脏数据（如 app=插件名）也能被匹配并修正
             $existing = Menu::query()
                 ->where('source', $source)
-                ->where('app', $app)
                 ->where('code', $code)
                 ->where('pid', (string) $pid)
                 ->first();
@@ -511,6 +510,13 @@ class MigratePluginMenuCommand extends BaseCommand
 
         if ((string) $model->pid !== (string) $pid) {
             $model->pid = $pid;
+            $changed = true;
+        }
+
+        // app 缺省即 admin：文件未声明时也强制校正为默认值（插件靠 source 区分）
+        $fileApp = $menu['app'] ?? 'admin';
+        if ($this->normalizeVal($model->app) !== $this->normalizeVal($fileApp)) {
+            $model->app = $fileApp;
             $changed = true;
         }
 
@@ -591,7 +597,7 @@ class MigratePluginMenuCommand extends BaseCommand
             $this->processWebNode($menu, $source, 0, $inserted, $skipped, $doUpdate, $updated, $isFull);
         }
 
-        return $doUpdate ? [$inserted, $skipped, $updated] : [$inserted, $skipped];
+        return $doUpdate ? [$inserted, $updated, $skipped] : [$inserted, $skipped];
     }
 
     /**
@@ -608,7 +614,6 @@ class MigratePluginMenuCommand extends BaseCommand
         bool $isFull = false
     ): ?string {
         $code = $menu['code'] ?? '';
-        $app = $menu['app'] ?? 'web';
 
         // pid_code 解析
         if ($pid === 0 && !empty($menu['pid_code'])) {
@@ -616,9 +621,9 @@ class MigratePluginMenuCommand extends BaseCommand
         }
 
         if (!$isFull && !empty($code)) {
+            // 按 source+code+pid 匹配，不限定 app：历史脏数据（如 app=插件名）也能被匹配并修正
             $existing = Db::table('web_menu')
                 ->where('source', $source)
-                ->where('app', $app)
                 ->where('code', $code)
                 ->where('pid', (string) $pid)
                 ->first();
@@ -678,6 +683,13 @@ class MigratePluginMenuCommand extends BaseCommand
 
         if ((string) ($existing['pid'] ?? '') !== (string) $pid) {
             Db::table('web_menu')->where('id', $id)->update(['pid' => $pid]);
+            $changed = true;
+        }
+
+        // app 缺省即 web：文件未声明时也强制校正为默认值（插件靠 source 区分）
+        $fileApp = $menu['app'] ?? 'web';
+        if ($this->normalizeVal($existing['app'] ?? '') !== $this->normalizeVal($fileApp)) {
+            Db::table('web_menu')->where('id', $id)->update(['app' => $fileApp]);
             $changed = true;
         }
 
