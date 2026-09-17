@@ -147,7 +147,7 @@ final class MemberAuthController extends Crud
         security: [['Bearer' => [], 'ApiKey' => []]],
         tags: ['权限相关-会员'],
     )]
-    #[Permission(code: 'member:auth:role_menu')]
+    #[Permission(code: 'member:auth:save_tag_menu')]
     #[SimpleResponse( example: '{"code": 0,"msg": "ok"}')]
     public function saveTagMenuRelation(Request $request): \support\Response
     {
@@ -175,7 +175,7 @@ final class MemberAuthController extends Crud
         required: true,
         schema: new OA\Schema(type: 'string'),
     )]
-    #[Permission(code: 'member:auth:tag_user_list')]
+    #[Permission(code: 'member:auth:user_list_by_tab_id')]
     #[SimpleResponse(example: ['code' => 0, 'message' => 'success', 'data' => []])]
     public function getUsersByTagId(Request $request): \support\Response
     {

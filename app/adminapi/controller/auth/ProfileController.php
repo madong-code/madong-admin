@@ -29,7 +29,6 @@ use app\service\admin\system\admin\AdminService;
 use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
-use madong\swagger\attribute\Permission;
 use OpenApi\Attributes as OA;
 use support\annotation\Middleware;
 use support\Container;
@@ -53,7 +52,6 @@ final class ProfileController extends Crud
         tags: ['个人中心']
     )]
     #[SimpleResponse(example: '{"id": 1, "user_name": "admin", "email": "test@example.com"}')]
-    #[Permission(code: 'admin:profile:info')]
     #[AllowAnonymous(requireToken: true, requirePermission: false)]
     public function show(Request $request): \support\Response
     {
@@ -79,7 +77,6 @@ final class ProfileController extends Crud
         content: new OA\JsonContent(ref: ProfileUpdateRequest::class)
     )]
     #[SimpleResponse(example: '{"code": 0, "msg": "success"}')]
-    #[Permission(code: 'admin:profile:update_info')]
     #[AllowAnonymous(requireToken: true, requirePermission: false)]
     public function update(Request $request): \support\Response
     {
@@ -109,7 +106,6 @@ final class ProfileController extends Crud
         content: new OA\JsonContent(ref: PasswordUpdateRequest::class)
     )]
     #[SimpleResponse(example: '{"code": 0, "msg": "密码修改成功"}')]
-    #[Permission(code: 'admin:profile:password')]
     #[AllowAnonymous(requireToken: true, requirePermission: false)]
     public function updatePassword(Request $request): \support\Response
     {
@@ -156,7 +152,6 @@ final class ProfileController extends Crud
             new OA\Property(property: 'avatar', description: '头像相对路径', type: 'string'),
         ]
     ), example: ['avatar' => '/upload/avatar/202606/abc123.jpg'])]
-    #[Permission(code: 'admin:profile:avatar')]
     #[AllowAnonymous(requireToken: true, requirePermission: false)]
     public function updateAvatar(Request $request): \support\Response
     {
@@ -205,7 +200,6 @@ final class ProfileController extends Crud
         schema: new OA\Schema(type: 'integer', default: 10)
     )]
     #[SimpleResponse(schema: [], example: [])]
-    #[Permission(code: 'admin:profile:sessions')]
     #[AllowAnonymous(requireToken: true, requirePermission: false)]
     public function getSessions(Request $request): \support\Response
     {
@@ -276,7 +270,6 @@ final class ProfileController extends Crud
         schema: new OA\Schema(type: 'string')
     )]
     #[SimpleResponse(schema: [], example: [])]
-    #[Permission(code: 'admin:profile:kickout')]
     #[AllowAnonymous(requireToken: true, requirePermission: false)]
     public function kickoutSession(Request $request): \support\Response
     {
@@ -317,7 +310,7 @@ final class ProfileController extends Crud
             ]
         )
     )]
-    #[Permission(code: 'system:admin:update_preferences')]
+    #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function updatePreferences(Request $request): \support\Response
     {

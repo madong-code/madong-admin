@@ -21,7 +21,6 @@ use app\service\admin\content\notepad\NotepadDocumentService;
 use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
-use madong\swagger\attribute\Permission;
 use OpenApi\Attributes as OA;
 use support\Container;
 use support\Request;
@@ -59,7 +58,6 @@ final class DocumentController
         required: false,
         schema: new OA\Schema(type: 'string'),
     )]
-    #[Permission(code: 'notepad:document:list')]
     #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function index(Request $request): Response
@@ -80,7 +78,6 @@ final class DocumentController
         summary: '获取文档详情',
         tags: ['记事本']
     )]
-    #[Permission(code: 'notepad:document:read')]
     #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function show(Request $request, string $id): Response
@@ -102,7 +99,7 @@ final class DocumentController
         summary: '创建文档',
         tags: ['记事本']
     )]
-    #[Permission(code: 'notepad:document:create')]
+    #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function store(Request $request): Response
     {
@@ -126,7 +123,7 @@ final class DocumentController
         summary: '更新文档',
         tags: ['记事本']
     )]
-    #[Permission(code: 'notepad:document:update')]
+    #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function update(Request $request, string $id): Response
     {
@@ -150,7 +147,7 @@ final class DocumentController
         summary: '移动文档到其他文件夹',
         tags: ['记事本']
     )]
-    #[Permission(code: 'notepad:document:update')]
+    #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function move(Request $request, string $id): Response
     {
@@ -178,7 +175,7 @@ final class DocumentController
         summary: '删除文档',
         tags: ['记事本']
     )]
-    #[Permission(code: 'notepad:document:delete')]
+    #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function delete(Request $request, string $id): Response
     {

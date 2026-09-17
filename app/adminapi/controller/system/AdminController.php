@@ -299,7 +299,7 @@ final class AdminController extends Crud
             SchemaConstants::X_SCHEMA_REQUEST => IdRequest::class,
         ]
     )]
-    #[Permission(code: 'system:admin:unlocked')]
+    #[Permission(code: 'system:admin:un_locked')]
     #[SimpleResponse(schema: [], example: [])]
     public function unLocked(Request $request): \support\Response
     {

@@ -22,7 +22,6 @@ use app\service\admin\content\notepad\NotepadFolderService;
 use core\foundation\tool\Json;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
-use madong\swagger\attribute\Permission;
 use OpenApi\Attributes as OA;
 use support\Container;
 use support\Request;
@@ -47,7 +46,6 @@ final class FolderController
         summary: '获取文件夹树',
         tags: ['记事本']
     )]
-    #[Permission(code: 'notepad:folder:list')]
     #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function tree(Request $request): Response
@@ -66,7 +64,6 @@ final class FolderController
         summary: '获取所有文件夹',
         tags: ['记事本']
     )]
-    #[Permission(code: 'notepad:folder:list')]
     #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function index(Request $request): Response
@@ -85,7 +82,7 @@ final class FolderController
         summary: '创建文件夹',
         tags: ['记事本']
     )]
-    #[Permission(code: 'notepad:folder:create')]
+    #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function store(Request $request): Response
     {
@@ -109,7 +106,7 @@ final class FolderController
         summary: '更新文件夹',
         tags: ['记事本']
     )]
-    #[Permission(code: 'notepad:folder:update')]
+    #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function update(Request $request, string $id): Response
     {
@@ -133,7 +130,7 @@ final class FolderController
         summary: '删除文件夹(含子文件夹和文档)',
         tags: ['记事本']
     )]
-    #[Permission(code: 'notepad:folder:delete')]
+    #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function delete(Request $request, string $id): Response
     {

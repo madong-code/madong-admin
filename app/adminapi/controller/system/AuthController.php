@@ -61,7 +61,6 @@ final class AuthController extends Crud
         security: [['Bearer' => [], 'ApiKey' => []]],
         tags: ['权限相关'],
     )]
-    #[Permission(code: 'system:auth:user_info')]
     #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(example: '{"code": 0,"msg": "ok","data": {"id": "1","user_name": "admin","real_name": "超级管理员","nick_name": "超级管理员","is_super": 1,"mobile_phone": null,"email": null,"avatar": null,"signed": null,"dashboard": null,"dept_id": "","enabled": 1,"login_ip": "127.0.0.1","login_time": 1762429533,"created_by": null,"updated_by": null,"created_at": "2025-10-30T12:24:09.000000Z","updated_at": "2025-11-06T11:45:34.000000Z","deleted_at": null,"sex": 0,"remark": null,"birthday": null,"tel": null,"is_locked": 0,"role_id_list": [],"post_id_list": [],"created_date": "2025-10-30 20:24:09","updated_date": "2025-11-06 19:45:34","depts": [],"posts": [],"casbin": [],"roles": []}}')]
     public function getUserInfo(Request $request): \support\Response
@@ -90,7 +89,6 @@ final class AuthController extends Crud
         security: [['Bearer' => [], 'ApiKey' => []]],
         tags: ['权限相关'],
     )]
-    #[Permission(code: 'system:auth:user_menus')]
     #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function getPermissionsMenu(Request $request): \support\Response
@@ -142,7 +140,6 @@ final class AuthController extends Crud
         security: [['Bearer' => [], 'ApiKey' => []]],
         tags: ['权限相关'],
     )]
-    #[Permission(code: 'system:auth:perm_code')]
     #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(example: '{"code": 0,"msg": "ok","data": ["admin"]}')]
     public function getUserCodes(Request $request): \support\Response
@@ -184,7 +181,7 @@ final class AuthController extends Crud
         security: [['Bearer' => [], 'ApiKey' => []]],
         tags: ['权限相关'],
     )]
-    #[Permission(code: 'system:auth:role_scope_ids')]
+    #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(example: ['code' => 0, 'message' => 'success', 'data' => []])]
     public function roleScopeIds(Request $request): \support\Response
     {
@@ -345,7 +342,6 @@ final class AuthController extends Crud
         security: [['Bearer' => [], 'ApiKey' => []]],
         tags: ['权限相关'],
     )]
-    #[Permission(code: 'system:auth:refresh_token')]
     #[AllowAnonymous(requireToken: false, requirePermission: false)]
     #[SimpleResponse(example: '{"data": "new_access_token"}')]
     public function refreshToken(Request $request): \support\Response

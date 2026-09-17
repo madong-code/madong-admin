@@ -38,7 +38,6 @@ final class TerminalController
         tags: ["终端管理"]
     )]
     #[Permission(code: "terminal:config:read")]
-    #[AllowAnonymous(requireToken: false, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [
         'enabled'             => true,
         'npm_package_manager' => 'pnpm',
@@ -200,7 +199,7 @@ final class TerminalController
         summary: "更新终端配置",
         tags: ["终端管理"]
     )]
-    #[Permission(code: "terminal:config:create")]
+    #[Permission(code: "terminal:config:update")]
     #[SimpleResponse(schema: [], example: [])]
     public function updateConfig(Request $request): Response
     {
@@ -232,7 +231,6 @@ final class TerminalController
         tags: ["终端管理"]
     )]
     #[Permission(code: "terminal:config:commands")]
-    #[AllowAnonymous(requireToken: false, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function commands(Request $request): Response
     {
@@ -333,7 +331,7 @@ final class TerminalController
         required: false,
         schema: new OA\Schema(type: "string"),
     )]
-    #[Permission(code: "terminal:execute")]
+    #[Permission(code: "terminal:exec")]
     #[SimpleResponse(schema: [], example: [])]
     public function execute(Request $request): Response
     {

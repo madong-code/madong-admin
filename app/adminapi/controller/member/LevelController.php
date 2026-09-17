@@ -133,7 +133,7 @@ final class LevelController extends Crud
             SchemaConstants::X_SCHEMA_REQUEST => IdRequest::class,
         ]
     )]
-    #[Permission("member:level:show")]
+    #[Permission("member:level:read")]
     public function show(Request $request): \support\Response
     {
         return parent::show($request);

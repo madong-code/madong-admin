@@ -25,6 +25,7 @@ use core\foundation\tool\Json;
 use madong\swagger\annotation\response\DataResponse;
 use madong\swagger\annotation\response\PageResponse;
 use madong\swagger\annotation\response\SimpleResponse;
+use madong\swagger\attribute\AllowAnonymous;
 use madong\swagger\attribute\Permission;
 use OpenApi\Attributes as OA;
 use support\annotation\Middleware;
@@ -181,7 +182,7 @@ final class CategoryController extends Crud
         summary: '分类下消息定义(按ID)',
         tags: ['消息分类'],
     )]
-    #[Permission(code: 'message:category:definitions')]
+    #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function definitions(Request $request): \support\Response
     {
@@ -195,7 +196,7 @@ final class CategoryController extends Crud
         summary: '分类下模块(兼容旧路由)',
         tags: ['消息分类'],
     )]
-    #[Permission(code: 'message:category:modules')]
+    #[AllowAnonymous(requireToken: true, requirePermission: false)]
     #[SimpleResponse(schema: [], example: [])]
     public function modules(Request $request): \support\Response
     {
