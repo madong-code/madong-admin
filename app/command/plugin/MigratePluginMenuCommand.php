@@ -473,6 +473,16 @@ class MigratePluginMenuCommand extends BaseCommand
                 ->where('pid', (string) $pid)
                 ->first();
 
+            // 未命中同 pid 时回退为仅按 source+code 匹配：
+            // 使「调整菜单层级」被识别为更新（pid 由 updateAdminNodeFields 改写），
+            // 而不是插入新节点、把旧节点留成不可达孤儿行
+            if (!$existing) {
+                $existing = Menu::query()
+                    ->where('source', $source)
+                    ->where('code', $code)
+                    ->first();
+            }
+
             if ($existing) {
                 if ($doUpdate) {
                     $changed = $this->updateAdminNodeFields($existing, $menu, $pid, $source);
@@ -641,6 +651,14 @@ class MigratePluginMenuCommand extends BaseCommand
                 ->where('code', $code)
                 ->where('pid', (string) $pid)
                 ->first();
+
+            // 未命中同 pid 时回退为仅按 source+code 匹配（同 admin：支持调整菜单层级）
+            if (!$existing) {
+                $existing = Db::table('web_menu')
+                    ->where('source', $source)
+                    ->where('code', $code)
+                    ->first();
+            }
 
             if ($existing) {
                 if ($doUpdate) {
