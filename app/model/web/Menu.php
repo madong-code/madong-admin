@@ -15,9 +15,9 @@ namespace app\model\web;
 
 use app\enum\common\EnabledStatus;
 use app\enum\common\YesNoStatus;
-use app\enum\system\MenuType;
 use app\enum\web\MenuCategory;
 use app\enum\web\MenuTarget;
+use app\enum\web\MenuType;
 use core\foundation\base\BaseModel;
 
 /**
@@ -78,6 +78,12 @@ class Menu extends BaseModel
         'extra'     => 'json',
         'id'        => 'string',
         'pid'       => 'string',
+        // 以下字段均为枚举字典驱动，统一为整型，避免与字典项（int）类型不一致
+        'category'  => 'integer',
+        'type'      => 'integer',
+        'target'    => 'integer',
+        'is_show'   => 'integer',
+        'enabled'   => 'integer',
     ];
 
     /**

@@ -41,4 +41,15 @@ enum MenuTarget: int implements IEnum
     {
         return $this->text();
     }
+
+    /**
+     * 获取颜色标识
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::SELF => '#409EFF',
+            self::BLANK => '#E6A23C',
+        };
+    }
 }

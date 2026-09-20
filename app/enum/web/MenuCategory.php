@@ -22,6 +22,7 @@ enum MenuCategory: int implements IEnum
 {
     case NAV = 1;    // 导航菜单
     case MEMBER = 2; // 会员菜单
+    case HEADER = 3; // 头部动作菜单
 
     /**
      * 获取文本
@@ -31,6 +32,7 @@ enum MenuCategory: int implements IEnum
         return match ($this) {
             self::NAV => '导航菜单',
             self::MEMBER => '会员菜单',
+            self::HEADER => '头部动作菜单',
         };
     }
 
@@ -40,5 +42,17 @@ enum MenuCategory: int implements IEnum
     public function label(): string
     {
         return $this->text();
+    }
+
+    /**
+     * 获取颜色标识
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::NAV => '#409EFF',
+            self::MEMBER => '#67C23A',
+            self::HEADER => '#E6A23C',
+        };
     }
 }

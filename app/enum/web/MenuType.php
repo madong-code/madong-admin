@@ -46,4 +46,17 @@ enum MenuType: int implements IEnum
     {
         return $this->text();
     }
+
+    /**
+     * 获取颜色标识
+     */
+    public function color(): string
+    {
+        return match ($this) {
+            self::DIRECTORY => '#409EFF',
+            self::NAV => '#67C23A',
+            self::LINK => '#E6A23C',
+            self::PAGE => '#909399',
+        };
+    }
 }
