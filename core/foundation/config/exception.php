@@ -23,6 +23,7 @@ return [
             \core\foundation\exception\handler\ServerErrorHttpException::class,
             \core\foundation\exception\handler\TooManyRequestsHttpException::class,
             \core\foundation\exception\handler\UnauthorizedHttpException::class,
+            \support\exception\BusinessException::class,
         ],
         // 自定义HTTP状态码
         'status'      => [

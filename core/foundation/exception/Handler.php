@@ -21,6 +21,7 @@ use core\security\jwt\ex\JwtTokenInvalidException;
 use FastRoute\BadRouteException;
 use core\foundation\exception\handler\BaseException;
 use core\foundation\exception\handler\ServerErrorHttpException;
+use support\exception\BusinessException;
 use think\exception\ValidateException;
 use Throwable;
 use Webman\Exception\ExceptionHandler;
@@ -65,7 +66,10 @@ class Handler extends ExceptionHandler
         }
 
         $this->initializeConfig();
-        $this->addRequestInfoToResponse($request);
+        // 业务异常仅返回 code/msg，不回显请求上下文
+        if (!$exception instanceof BusinessException) {
+            $this->addRequestInfoToResponse($request);
+        }
         $this->processException($exception);
         $this->addDebugInfoToResponse($exception);
         $this->triggerEvents($exception);
@@ -141,6 +145,12 @@ class Handler extends ExceptionHandler
                 $this->statusCode = 500;
                 $this->errorCode=-1;
                 break;
+            case $e instanceof BusinessException:
+                // 业务异常：HTTP 200 + 业务错误码，保留原始提示信息（如"积分不足"）
+                $this->statusCode   = 200;
+                $this->errorCode    = $e->getCode() ?: -1;
+                $this->errorMessage = $e->getMessage();
+                break;
             default:
                 $this->statusCode   = $status['server_error'] ?? 500;
                 $this->errorMessage = 'Internal Server Error';
@@ -180,8 +190,8 @@ class Handler extends ExceptionHandler
         $bodyKey      = array_keys($this->config['body']);
         $bodyValue    = array_values($this->config['body']);
         
-        // 当HTTP状态码为错误状态时，确保code不为0
-        $code = $bodyValue[0] ?? 0;
+        // 优先使用异常携带的业务错误码；HTTP错误状态下确保code不为0
+        $code = $this->errorCode ?: ($bodyValue[0] ?? 0);
         if ($this->statusCode >= 400 && $code === 0) {
             $code = -1;
         }
