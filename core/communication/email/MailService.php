@@ -32,6 +32,7 @@ class MailService
      * group_code → ConfigService 类名映射
      */
     private const CONFIG_SERVICE_MAP = [
+        'default'  => AdminConfigService::class,
         'platform' => AdminConfigService::class,
         'setting'  => AdminConfigService::class,
     ];
@@ -44,7 +45,7 @@ class MailService
     protected ?PHPMailer $mailer;
     protected string $groupCode;
 
-    public function __construct($host = null, $username = null, $password = null, $port = null, $encryption = null, string $groupCode = 'setting')
+    public function __construct($host = null, $username = null, $password = null, $port = null, $encryption = null, string $groupCode = 'default')
     {
         $this->groupCode = $groupCode;
         if (!extension_loaded('openssl')) {
@@ -70,6 +71,9 @@ class MailService
     {
         $configService = $this->resolveConfigService();
         $config        = $configService->config(self::SETTING_CONFIG_CODE, [], ['group_code' => $this->groupCode]);
+        if (empty($config) || empty($config['Host']) || empty($config['Username'])) {
+            throw new \RuntimeException('邮件服务未配置，请在后台系统设置中配置 SMTP 参数');
+        }
         $this->mailer->isSMTP(); // 使用 SMTP
         $this->mailer->Host       = $host ?? $config['Host']; // 默认 SMTP 服务器地址
         $this->mailer->SMTPAuth   = true; // 启用 SMTP 身份验证

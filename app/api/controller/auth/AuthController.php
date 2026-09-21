@@ -24,6 +24,7 @@ use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
 use OpenApi\Attributes as OA;
 use support\Container;
+use support\Redis;
 use Webman\Http\Request;
 use Webman\Http\Response;
 
@@ -289,15 +290,21 @@ final class AuthController extends Base
             $captchaKey  = $request->post('captcha_key');
             $captchaCode = $request->post('captcha_code');
 
-            // 验证图片验证码
-            if (empty($captchaKey) || empty($captchaCode)) {
-                throw new Exception('图片验证码不能为空', 400);
+            // 图形验证通过后记录标记：10分钟内同邮箱重发可免图形验证（发送频率仍由服务层60秒限制约束）
+            $passKey       = 'email_captcha_ok:' . $email;
+            $captchaPassed = false;
+            if (!empty($captchaKey) && !empty($captchaCode)) {
+                $captchaPassed = (new Captcha())->check($captchaKey, $captchaCode);
+                if ($captchaPassed) {
+                    Redis::setex($passKey, 600, '1');
+                }
             }
 
-            $captcha = new Captcha();
-            if (!$captcha->check($captchaKey, $captchaCode)) {
-                throw new Exception('图片验证码错误', 400);
+            // 首次发送必须通过图形验证；窗口内已验证过的邮箱允许免图形验证重发
+            if (!$captchaPassed && !Redis::get($passKey)) {
+                throw new Exception(empty($captchaKey) || empty($captchaCode) ? '图片验证码不能为空' : '图片验证码错误', 400);
             }
+
             $this->service->sendEmailCode($email);
             return Json::success('success', []);
         } catch (Exception $e) {

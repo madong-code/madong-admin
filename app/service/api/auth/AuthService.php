@@ -17,7 +17,7 @@ use app\api\CurrentMember;
 use app\dao\member\MemberDao;
 use app\enum\common\EnabledStatus;
 use app\model\member\Member;
-use app\service\admin\system\ConfigService;
+use app\service\api\system\ConfigService;
 use core\foundation\base\BaseService;
 use core\communication\email\MailService;
 use core\security\jwt\JwtToken;
@@ -378,6 +378,9 @@ class AuthService extends BaseService
 
         // 检查邮箱是否存在
         $member = $this->dao->query()->where('email', $data['email'])->first();
+        if (!$member) {
+            throw new \Exception('该邮箱未注册', 404);
+        }
 
         // 生成临时token用于第二步密码重置
         $resetToken = $this->generateResetToken($member->id);
