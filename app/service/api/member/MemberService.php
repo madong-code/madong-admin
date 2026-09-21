@@ -361,13 +361,15 @@ class MemberService extends BaseService
     {
         $member = $this->dao->getActiveUsers($limit);
         return $member->map(function ($item) {
+            // 活跃时间 = 最后一次有效请求心跳，无心跳时回退最后登录时间
+            $lastActive = $item->last_active_time ?? $item->last_login_time;
             return [
                 'id'          => $item->id,
                 'username'    => $item->username,
                 'nickname'    => $item->nickname,
                 'avatar'      => $item->avatar,
                 'intro'       => $item->intro ?? "",
-                'last_active' => $item->last_time,
+                'last_active' => $lastActive ? date('Y-m-d H:i:s', (int)$lastActive) : null,
             ];
         })->toArray();
     }

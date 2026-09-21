@@ -61,6 +61,7 @@ class Member extends BaseModel
         'gender',
         'birthday',
         'last_login_time',
+        'last_active_time',
         'last_login_ip',
         'login_count',
         'enabled',

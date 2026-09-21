@@ -41,6 +41,9 @@ class MemberDao extends BaseDao
     /**
      * 获取活跃用户
      *
+     * 活跃判定 = 最近一次有效 API 请求（last_active_time，中间件节流更新），
+     * 未产生过心跳的用户回退按登录时间（last_login_time）计算。
+     *
      * @param int $limit
      *
      * @return \Illuminate\Database\Eloquent\Collection
@@ -48,13 +51,13 @@ class MemberDao extends BaseDao
      */
     public function getActiveUsers(int $limit = 5): \Illuminate\Database\Eloquent\Collection
     {
-        // last_time 字段存储为时间戳格式（dateFormat = 'U'）
-        // 计算30天前的时间戳
-        $thirtyDaysAgo = time() - (30 * 24 * 60 * 60);
+        // 时间字段存储为时间戳格式（dateFormat = 'U'）
+        // 计算7天前的时间戳
+        $sevenDaysAgo = time() - (7 * 24 * 60 * 60);
 
         return $this->query()->withoutGlobalScope(AccessPermissionScope::class)
-            ->where('last_login_time', '>=', $thirtyDaysAgo)
-            ->orderBy('last_login_time', 'desc')
+            ->whereRaw('COALESCE(last_active_time, last_login_time, 0) >= ?', [$sevenDaysAgo])
+            ->orderByRaw('COALESCE(last_active_time, last_login_time, 0) DESC')
             ->limit($limit)
             ->get();
     }
