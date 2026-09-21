@@ -309,48 +309,49 @@ class MemberService extends BaseService
 
     /**
      * 上传头像
+     *
+     * 统一走系统内置上传组件（core\io\upload，api 场景）落盘并登记上传记录，
+     * 成功后更新 member.avatar（存相对路径，与 admin 个人中心头像存储方式一致）。
+     *
+     * @throws \Exception
      */
     public function uploadAvatar(\Webman\Http\UploadFile $file): array
     {
         $memberId = $this->getCurrentMemberId();
-        
-        // 验证文件类型
+
+        // 验证文件类型（与前端 beforeAvatarUpload 校验规则一致）
         $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-        if (!in_array($file->getUploadMimeType(), $allowedTypes)) {
+        if (!in_array($file->getUploadMimeType(), $allowedTypes, true)) {
             throw new \Exception('只支持jpg、png、gif、webp格式的图片', 400);
         }
-        
+
         // 验证文件大小（最大2MB）
-        $maxSize = 2 * 1024 * 1024;
-        if ($file->getSize() > $maxSize) {
+        if ($file->getSize() > 2 * 1024 * 1024) {
             throw new \Exception('图片大小不能超过2MB', 400);
         }
-        
-        // 生成文件名
-        $extension = pathinfo($file->getUploadName(), PATHINFO_EXTENSION);
-        $filename = 'avatar_' . $memberId . '_' . time() . '.' . $extension;
-        
-        // 保存文件
-        $uploadPath = public_path() . '/uploads/avatar/';
-        if (!is_dir($uploadPath)) {
-            mkdir($uploadPath, 0755, true);
+
+        // 内置上传组件落盘（内部使用 $file->move，hash 命名，按 hash 去重）
+        /** @var \app\service\api\upload\UploadService $uploadService */
+        $uploadService = Container::make(\app\service\api\upload\UploadService::class);
+        $record        = $uploadService->uploadImage('avatar/' . date('Ym'));
+
+        // base_path 为站点相对 URL（如 /upload/avatar/202609/hash.jpg），前端 fullUrl 拼完整地址
+        $relativePath = $record->base_path ?? '';
+        if (empty($relativePath)) {
+            throw new \Exception('头像上传失败，未获取到文件地址', 500);
         }
-        
-        $file->moveTo($uploadPath . $filename);
-        
-        // 生成访问URL
-        $url = '/uploads/avatar/' . $filename;
-        
-        // 更新会员头像
+
+        // 更新会员头像并清除会员信息缓存（user-info 走 CacheService 缓存，不清则读到旧头像）
         $member = Member::find($memberId);
         if ($member) {
-            $member->avatar = $url;
+            $member->avatar = $relativePath;
             $member->save();
+            Container::make(CurrentMember::class)->clearCache($memberId);
         }
-        
+
         return [
-            'url' => $url,
-            'filename' => $filename
+            'url'      => $relativePath,
+            'filename' => $record->filename ?? '',
         ];
     }
     
