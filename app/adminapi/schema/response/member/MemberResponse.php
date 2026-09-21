@@ -69,7 +69,7 @@ class MemberResponse extends BaseResponseDTO
         property: 'avatar',
         description: '头像',
         type: 'string',
-        example: '/uploads/avatar.jpg'
+        example: '/upload/avatar/202609/42f86b9b36794fb9e380917c251f6d81.png'
     )]
     public ?string $avatar = null;
 
