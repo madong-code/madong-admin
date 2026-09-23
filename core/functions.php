@@ -30,8 +30,17 @@ if (!function_exists('full_url')) {
      */
     function full_url(string $relativeUrl = '', bool|string $domain = true, string $default = ''): string
     {
-        // 从配置获取 CDN URL
-        $cdnUrl = config('madong.upload.app.cdn_url', '');
+        // 资源域名按「当前存储平台」解析，不能读死 CDN 静态配置：
+        // - local：runtimeInfo() 返回空域名，回落当前站点主机，与站点同域
+        // - 云端：取当前驱动配置的访问域名（换桶 / 换域名 / 切换驱动后立即生效），
+        //   驱动未配置域名时 runtimeInfo() 内部已兜底静态配置
+        try {
+            $uploadInfo = \core\io\upload\UploadFile::runtimeInfo();
+        } catch (\Throwable) {
+            $uploadInfo = [];
+        }
+
+        $cdnUrl = rtrim((string)($uploadInfo['cdn_url'] ?? ''), '/');
 
         // 如果 CDN URL 为空，则使用默认的主机名
         if (empty($cdnUrl)) {
@@ -61,7 +70,7 @@ if (!function_exists('full_url')) {
         $url = $domain . $relativeUrl;
 
         // 添加 CDN URL 参数
-        $cdnUrlParams = config('madong.upload.app.cdn_url_params');
+        $cdnUrlParams = (string)($uploadInfo['cdn_url_params'] ?? '');
         if ($domain === $cdnUrl && $cdnUrlParams) {
             $separator = str_contains($url, '?') ? '&' : '?';
             $url       .= $separator . $cdnUrlParams;
