@@ -69,7 +69,7 @@ class Qiniu extends BaseUpload
         return $result;
     }
 
-    public function uploadServerFile(string $filePath): array
+    public function uploadServerFile(string $filePath, array $options = []): array
     {
         $file = new \SplFileInfo($filePath);
         if (!$file->isFile()) {
@@ -77,7 +77,7 @@ class Qiniu extends BaseUpload
         }
 
         $uniqueId = hash_file('sha256', $file->getPathname());
-        $object   = $this->buildObjectKey($uniqueId . '.' . $file->getExtension());
+        $object   = $this->buildObjectKey($uniqueId . '.' . $file->getExtension(), $options);
 
         $result = [
             'origin_name' => $file->getRealPath(),
@@ -85,7 +85,9 @@ class Qiniu extends BaseUpload
             'url'         => $this->config['domain'] . $this->dirSeparator . $object,
             'unique_id'   => $uniqueId,
             'size'        => $file->getSize(),
+            'mime_type'   => mime_content_type($file->getPathname()) ?: 'application/octet-stream',
             'extension'   => $file->getExtension(),
+            'base_path'   => $this->dirSeparator . $object,
         ];
 
         [$ret, $err] = $this->getInstance()->putFile($this->getUploadToken(), $object, $file->getPathname());
@@ -94,6 +96,36 @@ class Qiniu extends BaseUpload
         }
 
         return $result;
+    }
+
+    /**
+     * 私有空间：签发带签名的临时直链
+     *
+     * 传入地址非本空间域名时原样返回（外链不做签名）。
+     */
+    public function signedUrl(string $key, int $ttl = 0): string
+    {
+        $object = $this->normalizeObjectKey($key);
+        if ($object === null) {
+            return trim(str_replace('\\', '/', $key));
+        }
+
+        if (!$this->isPrivate()) {
+            return $this->buildPublicUrl($object);
+        }
+
+        $bucket    = (string)($this->config['bucket'] ?? '');
+        $domain    = rtrim((string)($this->config['domain'] ?? ''), '/');
+        $accessKey = (string)($this->config['accessKey'] ?? '');
+        $secretKey = (string)($this->config['secretKey'] ?? '');
+        if ($bucket === '' || $domain === '' || $accessKey === '' || $secretKey === '') {
+            throw new UploadException('私有空间配置不完整：bucket / domain / accessKey / secretKey 均不能为空');
+        }
+
+        $baseUrl = $this->buildPublicUrl($object);
+        $expires = $this->resolveDeadline($ttl) - time();
+
+        return (new Auth($accessKey, $secretKey))->privateDownloadUrl($baseUrl, $expires);
     }
 
     public function uploadBase64(string $base64, string $extension = 'png'): array

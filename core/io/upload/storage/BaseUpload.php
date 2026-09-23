@@ -46,9 +46,86 @@ abstract class BaseUpload implements UploadFileInterface
 
     abstract function uploadFile(array $options): mixed;
 
-    abstract function uploadServerFile(string $filePath): mixed;
+    abstract function uploadServerFile(string $filePath, array $options = []): mixed;
 
     abstract public function uploadBase64(string $base64, string $extension = 'JPEG'): mixed;
+
+    /**
+     * 当前空间是否为私有（非公开读）
+     */
+    public function isPrivate(): bool
+    {
+        return !empty($this->config['is_private']);
+    }
+
+    /**
+     * 生成资源访问地址
+     *
+     * 公开空间返回 域名 + 相对路径；私有空间由各驱动签发临时直链，未实现的驱动直接抛异常。
+     */
+    public function signedUrl(string $key, int $ttl = 0): string
+    {
+        if (!$this->isPrivate()) {
+            return $this->buildPublicUrl($key);
+        }
+
+        throw new UploadException('当前存储驱动未实现私有读:' . static::class);
+    }
+
+    /**
+     * 拼接公开访问地址（未配置域名时返回相对路径）
+     */
+    protected function buildPublicUrl(string $key): string
+    {
+        $key    = ltrim(str_replace('\\', '/', $key), '/');
+        $domain = rtrim((string)($this->config['domain'] ?? ''), '/');
+
+        return $domain === '' ? $this->dirSeparator . $key : $domain . $this->dirSeparator . $key;
+    }
+
+    /**
+     * 将传入地址归一化为对象 key
+     *
+     * 支持相对路径、以 / 开头的相对路径、协议相对地址，以及本空间域名下的绝对地址；
+     * 非本空间地址（外链）返回 null，由调用方保持原地址不变。
+     *
+     * @param string $key 资源地址或相对 key
+     *
+     * @return string|null
+     */
+    protected function normalizeObjectKey(string $key): ?string
+    {
+        $key = trim(str_replace('\\', '/', $key));
+        if ($key === '') {
+            return null;
+        }
+
+        if (preg_match('#^(https?:)?//#i', $key) !== 1) {
+            return ltrim($key, '/');
+        }
+
+        // 绝对地址 / 协议相对地址：仅本空间域名下的资源才可签名
+        $url        = str_starts_with($key, '//') ? 'http:' . $key : $key;
+        $domain     = rtrim((string)($this->config['domain'] ?? ''), '/');
+        $domainHost = $domain === '' ? '' : (string)parse_url($domain, PHP_URL_HOST);
+        $urlHost    = (string)parse_url($url, PHP_URL_HOST);
+        if ($domainHost === '' || $urlHost === '' || strcasecmp($domainHost, $urlHost) !== 0) {
+            return null;
+        }
+
+        return ltrim((string)parse_url($url, PHP_URL_PATH), '/');
+    }
+
+    /**
+     * 计算签名到期时间戳（对齐整点：同一小时内同一 key 签名一致，避免 CDN 缓存失效）
+     */
+    protected function resolveDeadline(int $ttl = 0): int
+    {
+        $ttl = $ttl > 0 ? $ttl : (int)($this->config['ttl'] ?? 0);
+        $ttl = $ttl > 0 ? $ttl : 3600;
+
+        return (int)(ceil((time() + $ttl) / 3600) * 3600);
+    }
 
     protected function loadConfig(array $config): void
     {

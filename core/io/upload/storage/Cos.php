@@ -15,6 +15,7 @@ namespace core\io\upload\storage;
 
 use core\foundation\exception\handler\UploadException;
 use Qcloud\Cos\Client;
+use Throwable;
 
 /**
  *
@@ -25,6 +26,9 @@ use Qcloud\Cos\Client;
 class Cos extends BaseUpload
 {
     protected ?Client $instance = null;
+
+    /** 私有读签名专用客户端（domain 为对外访问域名，与上传客户端不同） */
+    protected ?Client $signingInstance = null;
 
     /**
      * 获取实例
@@ -84,7 +88,7 @@ class Cos extends BaseUpload
         return $result;
     }
 
-    public function uploadServerFile(string $filePath): array
+    public function uploadServerFile(string $filePath, array $options = []): array
     {
         $file = new \SplFileInfo($filePath);
         if (!$file->isFile()) {
@@ -92,7 +96,7 @@ class Cos extends BaseUpload
         }
 
         $uniqueId = $this->getUniqueId($file->getPathname());
-        $object   = $this->buildObjectKey($uniqueId . '.' . $file->getExtension());
+        $object   = $this->buildObjectKey($uniqueId . '.' . $file->getExtension(), $options);
 
         $this->getInstance()->putObject([
             'Bucket' => $this->config['bucket'],
@@ -108,6 +112,52 @@ class Cos extends BaseUpload
             'size' => $file->getSize(),
             'extension' => $file->getExtension(),
         ];
+    }
+
+    /**
+     * 私有空间：签发带签名的临时直链
+     *
+     * 传入地址非本空间域名时原样返回（外链不做签名）。
+     */
+    public function signedUrl(string $key, int $ttl = 0): string
+    {
+        $object = $this->normalizeObjectKey($key);
+        if ($object === null) {
+            return trim(str_replace('\\', '/', $key));
+        }
+
+        if (!$this->isPrivate()) {
+            return $this->buildPublicUrl($object);
+        }
+
+        $bucket    = (string)($this->config['bucket'] ?? '');
+        $domain    = rtrim((string)($this->config['domain'] ?? ''), '/');
+        $secretId  = (string)($this->config['secretId'] ?? '');
+        $secretKey = (string)($this->config['secretKey'] ?? '');
+        $region    = (string)($this->config['region'] ?? '');
+        if ($bucket === '' || $domain === '' || $secretId === '' || $secretKey === '') {
+            throw new UploadException('私有空间配置不完整：secretId / secretKey / bucket / domain 均不能为空');
+        }
+
+        // COS 签名默认包含 Host，签名客户端必须使用对外访问域名作为 domain，
+        // 否则签名与前端实际请求的 Host 不一致会返回 403
+        $host = (string)preg_replace('#^https?://#i', '', $domain);
+
+        try {
+            $client = $this->signingInstance ??= new Client([
+                'region' => $region === '' ? 'ap-shanghai' : $region,
+                'schema' => 'https',
+                'domain' => $host,
+                'credentials' => [
+                    'secretId' => $secretId,
+                    'secretKey' => $secretKey,
+                ],
+            ]);
+
+            return rtrim($client->getObjectUrl($bucket, $object, gmdate('Y-m-d\TH:i:s\Z', $this->resolveDeadline($ttl))), '&');
+        } catch (Throwable $exception) {
+            throw new UploadException('COS 私有签名失败: ' . $exception->getMessage());
+        }
     }
 
     public function uploadBase64(string $base64, string $extension = 'png'): array

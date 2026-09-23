@@ -16,6 +16,7 @@ namespace core\io\upload\storage;
 use core\foundation\exception\handler\UploadException;
 use OSS\Core\OssException;
 use OSS\OssClient;
+use Throwable;
 
 class Oss extends BaseUpload
 {
@@ -73,6 +74,49 @@ class Oss extends BaseUpload
         return $result;
     }
 
+    /**
+     * 私有空间：签发带签名的临时直链
+     *
+     * 传入地址非本空间域名时原样返回（外链不做签名）。
+     */
+    public function signedUrl(string $key, int $ttl = 0): string
+    {
+        $object = $this->normalizeObjectKey($key);
+        if ($object === null) {
+            return trim(str_replace('\\', '/', $key));
+        }
+
+        if (!$this->isPrivate()) {
+            return $this->buildPublicUrl($object);
+        }
+
+        $bucket          = (string)($this->config['bucket'] ?? '');
+        $domain          = rtrim((string)($this->config['domain'] ?? ''), '/');
+        $accessKeyId     = (string)($this->config['accessKeyId'] ?? '');
+        $accessKeySecret = (string)($this->config['accessKeySecret'] ?? '');
+        $endpoint        = (string)($this->config['endpoint'] ?? '');
+        if ($bucket === '' || $domain === '' || $accessKeyId === '' || $accessKeySecret === '' || $endpoint === '') {
+            throw new UploadException('私有空间配置不完整：accessKeyId / accessKeySecret / bucket / domain / endpoint 均不能为空');
+        }
+
+        try {
+            $url = $this->getInstance()->generatePresignedUrl(
+                $bucket,
+                $object,
+                $this->resolveDeadline($ttl),
+                OssClient::OSS_HTTP_GET
+            );
+        } catch (Throwable $exception) {
+            throw new UploadException('OSS 私有签名失败: ' . $exception->getMessage());
+        }
+
+        // V1 签名只签 CanonicalizedResource（/{bucket}/{object}）与 Expires，与 Host 无关，
+        // 因此把 SDK 生成的查询串挂到配置域名下即可，前端拿到的是自有 CDN 域名的临时直链
+        $query = (string)parse_url($url, PHP_URL_QUERY);
+
+        return $this->buildPublicUrl($object) . ($query === '' ? '' : '?' . $query);
+    }
+
     public function uploadBase64(string $base64, string $extension = 'image'): array|bool
     {
         $base64 = explode(',', $base64);
@@ -100,7 +144,7 @@ class Oss extends BaseUpload
         ];
     }
 
-    public function uploadServerFile(string $filePath): array
+    public function uploadServerFile(string $filePath, array $options = []): array
     {
         $file = new \SplFileInfo($filePath);
         if (!$file->isFile()) {
@@ -108,7 +152,7 @@ class Oss extends BaseUpload
         }
 
         $uniqueId = hash_file('sha256', $file->getPathname());
-        $object = $this->buildObjectKey($uniqueId . '.' . $file->getExtension());
+        $object = $this->buildObjectKey($uniqueId . '.' . $file->getExtension(), $options);
 
         $result = [
             'origin_name' => $file->getRealPath(),

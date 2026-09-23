@@ -130,8 +130,9 @@ class Local extends BaseUpload
     /**
      * 上传服务端文件
      * @param string $filePath 服务端文件路径
+     * @param array  $options  上传选项（支持 sub_dir 指定业务/插件子目录）
      */
-    public function uploadServerFile(string $filePath): array
+    public function uploadServerFile(string $filePath, array $options = []): array
     {
         $file = new \SplFileInfo($filePath);
         if (!$file->isFile()) {
@@ -154,7 +155,7 @@ class Local extends BaseUpload
         $basePathUrl  = $this->dirSeparator . $saveFilename;
 
         if (!empty($rootDir)) {
-            $subDir    = $this->getSubdir();
+            $subDir    = $this->getSubdir($options);
             $fullDir   = $rootDir . ($subDir ? $this->dirSeparator . $subDir : '');
             $savePath  = $root . $this->dirSeparator . $fullDir . $this->dirSeparator . $saveFilename;
             $url       = $domain . $this->dirSeparator . $fullDir . $this->dirSeparator . $saveFilename;
