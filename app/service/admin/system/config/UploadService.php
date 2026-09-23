@@ -17,7 +17,6 @@ namespace app\service\admin\system\config;
 use app\dao\system\config\UploadDao;
 use core\foundation\base\BaseService;
 use core\foundation\exception\handler\AdminException;
-use core\io\upload\support\StoragePathResolver;
 use core\io\upload\UploadFile;
 use madong\helper\Arr;
 use support\Container;
@@ -40,7 +39,6 @@ class UploadService extends BaseService
      */
     public function saveNetworkImage(string $url): array
     {
-        $config = UploadFile::config('local');
         $data   = file_get_contents($url);
         if ($data === false) {
             throw new AdminException('获取文件资源失败');
@@ -82,8 +80,11 @@ class UploadService extends BaseService
         $hash = md5_file($save_path);
         $size = filesize($save_path);
 
-        // 去重保持作用域，防止重复复用
-        $result = $this->dao->get(['hash' => $hash]);
+        $mode = UploadFile::config('upload')['mode'] ?? 'local';
+        // 去重保持作用域：同一 hash + 同一存储平台 + 同一存储空间才复用，
+        // 防止切换平台或切换公开/私有空间后返回当前空间访问不到的旧地址
+        $space  = UploadFile::spaceMark($mode);
+        $result = $this->dao->get(['hash' => $hash, 'platform' => $mode, 'space' => $space]);
         if (!empty($result)) {
             unlink($save_path);
             return $result->toArray();
@@ -95,33 +96,25 @@ class UploadService extends BaseService
         if (empty($local)) {
             throw new AdminException('缺少本地上传配置信息');
         }
-        $root      = Arr::fetchConfigValue($config, 'root') ?: 'public';
-        $dirname   = Arr::fetchConfigValue($config, 'dirname') ?: 'upload';
-        $folder    = date('Ymd');
-        $resolver  = new StoragePathResolver();
-        $relative  = $resolver->joinPaths($dirname, $resolver->pathSegment($config), $folder);
-        $full_dir  = base_path() . DIRECTORY_SEPARATOR . $root . DIRECTORY_SEPARATOR
-            . str_replace('/', DIRECTORY_SEPARATOR, $relative) . DIRECTORY_SEPARATOR;
-        if (!is_dir($full_dir)) {
-            mkdir($full_dir, 0777, true);
-        }
-        $object_name = bin2hex(pack('Nn', time(), random_int(1, 65535))) . ".$file_extension";
-        $newPath     = $full_dir . $object_name;
-
-        copy($save_path, $newPath);
+        // 交由存储适配器落盘（local/qiniu/oss/cos/s3），不再硬编码本地目录
+        $upload      = UploadFile::disk(null, false)->uploadServerFile($save_path);
+        $relative    = ltrim((string)($upload['base_path'] ?? ('/' . ltrim((string)$upload['save_path'], '/'))), '/');
+        $object_name = basename($relative);
+        $file_size   = (int)($upload['size'] ?? $size);
         unlink($save_path);
 
-        $info['platform']          = 'local';
+        $info['platform']          = $mode;
+        $info['space']             = $space;
         $info['original_filename'] = $filename;
         $info['filename']          = $object_name;
         $info['hash']              = $hash;
-        $info['content_type']      = $content_type;
-        $info['base_path']         = '/' . $relative . '/' . $object_name;
-        $info['path']              = $relative . '/' . $object_name;
-        $info['ext']               = $file_extension;
-        $info['size']              = $size;
-        $info['size_info']         = formatBytes($size);
-        $info['url']               = $relative . '/' . $object_name;
+        $info['content_type']      = $upload['mime_type'] ?? $content_type;
+        $info['base_path']         = '/' . $relative;
+        $info['path']              = $relative;
+        $info['ext']               = $upload['extension'] ?? $file_extension;
+        $info['size']              = $file_size;
+        $info['size_info']         = formatBytes($file_size);
+        $info['url']               = $relative;
         $result                    = $this->dao->save($info);
         return $result->toArray();
     }
@@ -159,13 +152,18 @@ class UploadService extends BaseService
                 $url  = str_replace('\\', '/', $data['url']);
                 $path = str_replace('\\', '/', $data['save_path']);
 
-                // 检查文件是否已存在（作用域内去重）
-                if ($filesInfo = $this->dao->get(['hash' => $hash])) {
+                // 存储空间标识（default=公开 / private=私有）：切换公开、私有空间后
+                // 同一份文件在当前空间已重新落盘，必须新建记录，不能复用另一空间的旧地址
+                $space = UploadFile::spaceMark($type);
+
+                // 检查文件是否已存在（同一 hash + 同一存储平台 + 同一存储空间才复用）
+                if ($filesInfo = $this->dao->get(['hash' => $hash, 'platform' => $type, 'space' => $space])) {
                     return $filesInfo;
                 }
 
                 $inData = [
                     'platform'          => $type,
+                    'space'             => $space,
                     'original_filename' => $data['origin_name'] ?? '',
                     'filename'          => $data['save_name'],
                     'hash'              => $hash,

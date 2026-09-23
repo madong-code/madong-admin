@@ -569,6 +569,8 @@ return new class {
                 $table->string('ext', 32)->nullable()->comment('文件扩展名');
                 $table->string('content_type', 100)->nullable()->comment('MIME类型');
                 $table->string('platform', 32)->nullable()->comment('存储平台');
+                $table->string('space', 50)->default('default')->comment('存储空间:default公开 private私有');
+                $table->index('space', 'idx_sys_upload_space');
                 $table->string('th_url', 255)->nullable()->comment('缩略图访问路径');
                 $table->string('th_filename', 255)->nullable()->comment('缩略图文件名');
                 $table->bigInteger('th_size')->nullable()->comment('缩略图大小');
