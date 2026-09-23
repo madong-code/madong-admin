@@ -37,7 +37,11 @@ return [
     'plugin.installing' => [],
     'plugin.installed' => [],
     'plugin.uninstalling' => [],
-    'plugin.uninstalled' => [],
+    'plugin.uninstalled' => [
+        // 按目录回收插件上传残留：{dirname}/{插件code}/ 下的云对象、本地目录与附件记录
+        // 是否启用由插件 config/info.php 的 uninstall.remove_upload 决定（默认 false）
+        [\app\listener\plugin\PluginUploadCleanupListener::class, 'handle'],
+    ],
     'plugin.updating' => [],
     'plugin.updated' => [],
 ];
