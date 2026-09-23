@@ -100,6 +100,10 @@ final class ConfigController extends Crud
             if (!empty($groupCode)) {
                 $options['group_code'] = $groupCode;
             }
+            // 站点配置：追加存储运行时信息（upload_mode / cdn_url / static_url），前端据此拼接资源完整地址
+            if ($code === 'site_setting') {
+                $options['with_upload_info'] = true;
+            }
             $result = $this->service->config($code, [], $options);
             return Json::success('操作成功', $result);
         } catch (\Exception $e) {
