@@ -62,4 +62,15 @@ interface UploadFileInterface
      * @return string
      */
     public function signedUrl(string $key, int $ttl = 0): string;
+
+    /**
+     * @desc: 删除存储对象
+     * - 本地存储：$key 支持绝对文件系统路径或以存储根目录为基准的相对路径
+     * - 云存储：$key 支持对象 key 或本空间域名下的绝对地址
+     *
+     * @param string $key 资源 key / 本地文件路径
+     *
+     * @return bool 对象不存在（已删除）返回 false，删除成功返回 true
+     */
+    public function deleteFile(string $key): bool;
 }

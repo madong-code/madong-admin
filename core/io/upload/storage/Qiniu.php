@@ -15,16 +15,23 @@ namespace core\io\upload\storage;
 
 use core\foundation\exception\handler\UploadException;
 use Qiniu\Auth;
+use Qiniu\Storage\BucketManager;
 use Qiniu\Storage\UploadManager;
 
 class Qiniu extends BaseUpload
 {
     protected ?UploadManager $instance = null;
     protected ?string $uploadToken = null;
+    protected ?BucketManager $bucketManager = null;
 
     public function getInstance(): UploadManager
     {
         return $this->instance ??= new UploadManager();
+    }
+
+    public function getBucketManager(): BucketManager
+    {
+        return $this->bucketManager ??= new BucketManager(new Auth($this->config['accessKey'], $this->config['secretKey']));
     }
 
     public function getUploadToken(): string
@@ -126,6 +133,33 @@ class Qiniu extends BaseUpload
         $expires = $this->resolveDeadline($ttl) - time();
 
         return (new Auth($accessKey, $secretKey))->privateDownloadUrl($baseUrl, $expires);
+    }
+
+    /**
+     * 删除云端对象
+     *
+     * @param string $key 对象 key 或本空间域名下的绝对地址
+     *
+     * @return bool 对象不存在返回 false
+     * @throws UploadException
+     */
+    public function deleteFile(string $key): bool
+    {
+        $object = $this->normalizeObjectKey($key);
+        if ($object === null || $object === '') {
+            throw new UploadException('七牛资源 key 非法，已拒绝删除: ' . $key);
+        }
+
+        [$ret, $err] = $this->getBucketManager()->delete($this->config['bucket'], $object);
+        if ($err) {
+            // 612：文件不存在，按已删除处理
+            if ((int)($err->code ?? 0) === 612) {
+                return false;
+            }
+            throw new UploadException((string)$err);
+        }
+
+        return true;
     }
 
     public function uploadBase64(string $base64, string $extension = 'png'): array

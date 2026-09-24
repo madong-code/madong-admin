@@ -173,5 +173,31 @@ class Oss extends BaseUpload
         }
         return $result;
     }
-}
 
+    /**
+     * 删除云端对象
+     *
+     * @param string $key 对象 key 或本空间域名下的绝对地址
+     *
+     * @return bool 对象不存在返回 false
+     * @throws UploadException
+     */
+    public function deleteFile(string $key): bool
+    {
+        $object = $this->normalizeObjectKey($key);
+        if ($object === null || $object === '') {
+            throw new UploadException('OSS 资源 key 非法，已拒绝删除: ' . $key);
+        }
+
+        try {
+            $this->getInstance()->deleteObject($this->config['bucket'], $object);
+        } catch (OssException $exception) {
+            if ($exception->getErrorCode() === 'NoSuchKey') {
+                return false;
+            }
+            throw new UploadException($exception->getMessage());
+        }
+
+        return true;
+    }
+}

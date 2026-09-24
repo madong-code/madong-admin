@@ -73,6 +73,16 @@ abstract class BaseUpload implements UploadFileInterface
     }
 
     /**
+     * 删除存储对象
+     *
+     * 默认不支持，由各驱动按自身协议实现。
+     */
+    public function deleteFile(string $key): bool
+    {
+        throw new UploadException('当前存储驱动未实现资源删除:' . static::class);
+    }
+
+    /**
      * 拼接公开访问地址（未配置域名时返回相对路径）
      */
     protected function buildPublicUrl(string $key): string

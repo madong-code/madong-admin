@@ -188,5 +188,32 @@ class S3 extends BaseUpload
             'extension' => $extension,
         ];
     }
+
+    /**
+     * 删除云端对象
+     *
+     * @param string $key 对象 key 或本空间域名下的绝对地址
+     *
+     * @return bool 对象不存在返回 false
+     * @throws UploadException
+     */
+    public function deleteFile(string $key): bool
+    {
+        $object = $this->normalizeObjectKey($key);
+        if ($object === null || $object === '') {
+            throw new UploadException('S3 资源 key 非法，已拒绝删除: ' . $key);
+        }
+
+        try {
+            $this->getInstance()->deleteObject([
+                'Bucket' => $this->config['bucket'],
+                'Key' => $object,
+            ]);
+        } catch (Throwable $exception) {
+            throw new UploadException('S3 删除失败: ' . $exception->getMessage());
+        }
+
+        return true;
+    }
 }
 
