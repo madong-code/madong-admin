@@ -41,6 +41,7 @@ return new class {
                 $table->tinyInteger('gender')->default(0)->comment('性别: 0-未知 1-男 2-女');
                 $table->integer('birthday')->nullable()->comment('生日时间戳');
                 $table->integer('last_login_time')->nullable()->comment('最后登录时间戳');
+                $table->integer('last_active_time')->nullable()->comment('最后活跃时间戳(任意有效请求节流更新)');
                 $table->string('last_login_ip', 50)->nullable()->comment('最后登录IP');
                 $table->integer('login_count')->default(0)->comment('登录次数');
                 $table->tinyInteger('enabled')->default(1)->comment('状态: 1-启用 0-禁用');
@@ -51,6 +52,7 @@ return new class {
                 $table->index('level_id');
                 $table->index('enabled');
                 $table->index('created_at');
+                $table->index('last_active_time', 'idx_member_last_active_time');
             });
         }
 
