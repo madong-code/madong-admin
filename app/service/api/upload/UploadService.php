@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace app\service\api\upload;
 
 use app\dao\system\config\UploadDao;
+use app\model\system\config\Upload;
 use core\foundation\base\BaseService;
 use core\foundation\exception\handler\AdminException;
 use core\io\upload\UploadFile;
@@ -52,15 +53,15 @@ class UploadService extends BaseService
      * @return mixed
      * @throws \Throwable
      */
-    public function uploadImage(string $upload = '', bool $isLocal = false): mixed
+    public function uploadImage(string $upload = '', bool $isLocal = false, string $source = Upload::SOURCE_DEFAULT): mixed
     {
         try {
-            return $this->transaction(function () use ($upload, $isLocal) {
+            return $this->transaction(function () use ($upload, $isLocal, $source) {
                 $config = $this->getUploadConfig();
                 if ($isLocal) {
                     $config['mode'] = 'local';
                 }
-                return $this->handleUpload($config, $upload);
+                return $this->handleUpload($config, $upload, $source);
             });
         } catch (\Exception $e) {
             throw new AdminException($e->getMessage());
@@ -76,15 +77,15 @@ class UploadService extends BaseService
      * @return mixed
      * @throws \Throwable
      */
-    public function uploadVideo(string $upload = '', bool $isLocal = false): mixed
+    public function uploadVideo(string $upload = '', bool $isLocal = false, string $source = Upload::SOURCE_DEFAULT): mixed
     {
         try {
-            return $this->transaction(function () use ($upload, $isLocal) {
+            return $this->transaction(function () use ($upload, $isLocal, $source) {
                 $config = $this->getUploadConfig();
                 if ($isLocal) {
                     $config['mode'] = 'local';
                 }
-                return $this->handleUpload($config, $upload);
+                return $this->handleUpload($config, $upload, $source);
             });
         } catch (\Exception $e) {
             throw new AdminException($e->getMessage());
@@ -100,10 +101,10 @@ class UploadService extends BaseService
      * @return mixed
      * @throws \Throwable
      */
-    public function uploadFile(string $upload = '', bool $isLocal = false): mixed
+    public function uploadFile(string $upload = '', bool $isLocal = false, string $source = Upload::SOURCE_DEFAULT): mixed
     {
         try {
-            return $this->transaction(function () use ($upload, $isLocal) {
+            return $this->transaction(function () use ($upload, $isLocal, $source) {
                 $baseConfig = $this->getUploadConfig();
                 $config     = [
                     'mode'         => $baseConfig['mode'] ?? 'local',
@@ -116,7 +117,7 @@ class UploadService extends BaseService
                 if ($isLocal) {
                     $config['mode'] = 'local';
                 }
-                return $this->handleUpload($config, $upload);
+                return $this->handleUpload($config, $upload, $source);
             });
         } catch (\Exception $e) {
             throw new AdminException($e->getMessage());
@@ -132,7 +133,7 @@ class UploadService extends BaseService
      * @return mixed
      * @throws \Exception
      */
-    public function fetchImage(string $url, string $subDir = ''): array
+    public function fetchImage(string $url, string $subDir = '', string $source = Upload::SOURCE_DEFAULT): array
     {
         $scene = $this->getScene();
         $mode  = UploadFile::config('upload', [], $scene)['mode'] ?? 'local';
@@ -182,8 +183,9 @@ class UploadService extends BaseService
         $size   = filesize($save_path);
         // 存储空间标识（default=公开 / private=私有）
         $space = UploadFile::spaceMark($mode, $scene);
-        // 去重：同一 hash + 同一存储平台 + 同一存储空间的文件才复用（跨平台、跨空间不复用）
-        $result = $this->dao->get(['hash' => $hash, 'platform' => $mode, 'space' => $space]);
+        // 去重：同一 hash + 同一存储平台 + 同一存储空间 + 同一来源才复用
+        // （跨平台、跨空间、跨来源都不复用，避免插件与系统互相占用对方记录）
+        $result = $this->dao->get(['hash' => $hash, 'platform' => $mode, 'space' => $space, 'source' => $source]);
         if (!empty($result)) {
             unlink($save_path);
             return $result->toArray();
@@ -198,6 +200,7 @@ class UploadService extends BaseService
 
         $info['platform']          = $mode;
         $info['space']             = $space;
+        $info['source']            = $source;
         $info['original_filename'] = $filename;
         $info['filename']          = $object_name;
         $info['hash']              = $hash;
@@ -221,7 +224,7 @@ class UploadService extends BaseService
      * @return mixed
      * @throws \Exception
      */
-    public function uploadBase64Image(string $base64Data, string $subDir = ''): array
+    public function uploadBase64Image(string $base64Data, string $subDir = '', string $source = Upload::SOURCE_DEFAULT): array
     {
         if (str_starts_with($base64Data, 'data:image/')) {
             $base64Data = substr($base64Data, strpos($base64Data, ',') + 1);
@@ -294,8 +297,9 @@ class UploadService extends BaseService
         $mode     = UploadFile::config('upload', [], $scene)['mode'] ?? 'local';
         // 存储空间标识（default=公开 / private=私有）
         $space = UploadFile::spaceMark($mode, $scene);
-        // 去重：同一 hash + 同一存储平台 + 同一存储空间的文件才复用（跨平台、跨空间不复用）
-        $result = $this->dao->get(['hash' => $hash, 'platform' => $mode, 'space' => $space]);
+        // 去重：同一 hash + 同一存储平台 + 同一存储空间 + 同一来源才复用
+        // （跨平台、跨空间、跨来源都不复用，避免插件与系统互相占用对方记录）
+        $result = $this->dao->get(['hash' => $hash, 'platform' => $mode, 'space' => $space, 'source' => $source]);
         if (!empty($result)) {
             unlink($save_path);
             return $result->toArray();
@@ -310,6 +314,7 @@ class UploadService extends BaseService
 
         $info['platform']          = $mode;
         $info['space']             = $space;
+        $info['source']            = $source;
         $info['original_filename'] = $filename;
         $info['filename']          = $object_name;
         $info['hash']              = $hash;
@@ -333,7 +338,7 @@ class UploadService extends BaseService
      * @return mixed
      * @throws \Throwable
      */
-    private function handleUpload(array $config, string $upload = ''): mixed
+    private function handleUpload(array $config, string $upload = '', string $source = Upload::SOURCE_DEFAULT): mixed
     {
         $scene = $this->getScene();
 
@@ -351,14 +356,21 @@ class UploadService extends BaseService
         // 同一份文件在当前空间已重新落盘，必须新建记录，不能复用另一空间的旧地址
         $space = UploadFile::spaceMark($config['mode'], $scene);
 
-        // 检查文件是否已存在（按 hash + platform + space 去重，禁止跨平台、跨空间复用）
-        if ($filesInfo = $this->dao->get(['hash' => $data['unique_id'], 'platform' => $config['mode'], 'space' => $space])) {
+        // 检查文件是否已存在（按 hash + platform + space + source 去重，
+        // 禁止跨平台、跨空间、跨来源复用：插件资源不能占用系统记录，否则卸载会误删）
+        if ($filesInfo = $this->dao->get([
+            'hash'     => $data['unique_id'],
+            'platform' => $config['mode'],
+            'space'    => $space,
+            'source'   => $source,
+        ])) {
             return $filesInfo;
         }
 
         $inData = [
             'platform'          => $config['mode'],
             'space'             => $space,
+            'source'            => $source,
             'original_filename' => $data['origin_name'] ?? '',
             'filename'          => $data['save_name'],
             'hash'              => $data['unique_id'],

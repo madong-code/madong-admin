@@ -24,15 +24,18 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * 按目录前缀清理上传残留资源
+ * 按来源清理插件上传残留资源
  *
- * 回收 {dirname}/{code}/ 前缀下的云对象、本地目录与附件记录（dirname 默认 upload）。
+ * 以附件记录 sys_upload.source = plugin:{code} 精确识别归属，逐条按记录自身的存储平台
+ * 删除云对象 / 本地文件（local/qiniu/oss/cos/s3 全驱动），再删除附件记录；
+ * 对改造前的存量记录（source 仍为 default）以 {dirname}/{code}/ 目录前缀兜底识别，
+ * 最后清理本地孤儿文件目录。
  *
  * ┌─ 使用示例 ─────────────────────────────────────────────────────┐
  * │ php webman upload:clean-prefix portal                          │ 预演（默认，不删除）
  * │ php webman upload:clean-prefix portal --apply                  │ 真正执行清理
  * │ php webman upload:clean-prefix portal --apply --keep-db        │ 只清文件与云对象，保留附件记录
- * │ php webman upload:clean-prefix portal --apply --yes --limit=50000 │ 对象较多时显式确认
+ * │ php webman upload:clean-prefix portal --apply --yes --limit=50000 │ 记录较多时显式确认
  * └───────────────────────────────────────────────────────────────┘
  *
  * @author Mr.April
@@ -40,7 +43,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  */
 #[AsCommand(
     name: 'upload:clean-prefix',
-    description: 'Clean plugin upload resources by directory prefix (cloud objects + local dir + upload records)',
+    description: 'Clean plugin upload resources by source (storage objects + local dir + upload records)',
     aliases: ['upload:clean-prefix'],
     hidden: false
 )]
@@ -51,9 +54,9 @@ class CleanPrefixCommand extends BaseCommand
         $this
             ->addArgument('code', InputArgument::REQUIRED, '插件编码（同时作为存储子目录名，如 portal）')
             ->addOption('apply', null, InputOption::VALUE_NONE, '真正执行删除；缺省为预演（只盘点，不删任何资源）')
-            ->addOption('yes', null, InputOption::VALUE_NONE, '确认清理超出数量上限的对象（配合 --limit 使用）')
-            ->addOption('limit', null, InputOption::VALUE_OPTIONAL, '单次清理对象数量上限', (string)CloudResourceCleanerService::DEFAULT_LIMIT)
-            ->addOption('keep-db', null, InputOption::VALUE_NONE, '保留 md_sys_upload 附件记录，只清云对象与本地目录');
+            ->addOption('yes', null, InputOption::VALUE_NONE, '确认清理超出数量上限的记录（配合 --limit 使用）')
+            ->addOption('limit', null, InputOption::VALUE_OPTIONAL, '单次清理记录数量上限', (string)CloudResourceCleanerService::DEFAULT_LIMIT)
+            ->addOption('keep-db', null, InputOption::VALUE_NONE, '保留 sys_upload 附件记录，只清存储对象与本地目录');
     }
 
     public function __invoke(InputInterface $input, OutputInterface $output): int
@@ -77,26 +80,34 @@ class CleanPrefixCommand extends BaseCommand
             return $this->outputError($io, $e->getMessage(), $e);
         }
 
-        $io->text(sprintf('清理前缀: <info>%s</info>   存储方式: <info>%s</info>', $report['prefix'], $report['mode']));
+        $io->text(sprintf(
+            '插件编码: <info>%s</info>   来源标识: <info>%s</info>   存储方式: <info>%s</info>',
+            $report['code'],
+            $report['source'],
+            $report['mode']
+        ));
+        $io->text(sprintf('兜底前缀: <info>%s</info>（仅用于识别改造前的存量记录）', $report['prefix']));
 
         $cloud = $report['cloud'];
         $io->table(['目标', '指标', '值'], [
-            ['云端对象', '状态', $cloud['enabled'] ? '已启用' : '已跳过（七牛配置不完整）'],
-            ['云端对象', '命中数量', (string)$cloud['total']],
-            ['云端对象', '命中大小', formatBytes((int)$cloud['bytes'])],
-            ['云端对象', '已删除', (string)$cloud['deleted']],
-            ['云端对象', '失败', (string)$cloud['failed']],
+            ['存储对象', '状态', !empty($cloud['enabled']) ? '已启用（按附件记录逐条删除）' : '已跳过'],
+            ['存储对象', '命中记录', (string)$cloud['total']],
+            ['存储对象', '命中大小', formatBytes((int)$cloud['bytes'])],
+            ['存储对象', '已删除', (string)$cloud['deleted']],
+            ['存储对象', '已跳过', (string)$cloud['skipped']],
+            ['存储对象', '失败', (string)$cloud['failed']],
             ['本地目录', '路径', (string)$report['local']['path']],
             ['本地目录', '存在', !empty($report['local']['exists']) ? '是' : '否'],
             ['本地目录', '文件数 / 大小', $report['local']['files'] . ' / ' . formatBytes((int)$report['local']['bytes'])],
             ['本地目录', '已删除', !empty($report['local']['deleted']) ? '是' : '否'],
             ['附件记录', '命中行数', (string)$report['database']['matched']],
+            ['附件记录', '精确归属 / 前缀兜底', $report['database']['precise'] . ' / ' . $report['database']['fallback']],
             ['附件记录', '已删除', (string)$report['database']['deleted']],
             ['附件记录', '保留记录', !empty($report['database']['skipped']) ? '是（--keep-db）' : '否'],
         ]);
 
         if (!empty($cloud['sample'])) {
-            $io->text('云端对象样例（最多 20 条）：');
+            $io->text('存储对象样例（最多 20 条）：');
             foreach ($cloud['sample'] as $key) {
                 $io->text('  ' . $key);
             }

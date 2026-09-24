@@ -27,6 +27,24 @@ class Upload extends BaseModel
 {
 
     /**
+     * 系统默认来源（后台 / 平台自身上传）
+     */
+    public const SOURCE_DEFAULT = 'default';
+
+    /**
+     * 插件来源前缀，完整值形如 plugin:portal
+     */
+    public const SOURCE_PLUGIN_PREFIX = 'plugin:';
+
+    /**
+     * 构造插件来源标识
+     */
+    public static function pluginSource(string $code): string
+    {
+        return self::SOURCE_PLUGIN_PREFIX . $code;
+    }
+
+    /**
      * 数据表主键
      *
      * @var string
@@ -51,6 +69,7 @@ class Upload extends BaseModel
         'content_type',
         'platform',
         'space',
+        'source',
         'th_url',
         'th_filename',
         'th_size',
