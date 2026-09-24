@@ -16,6 +16,7 @@ namespace app\adminapi\middleware;
 
 use app\adminapi\CurrentUser;
 use app\adminapi\event\system\OperationLogEvent;
+use core\infrastructure\logger\Logger;
 use madong\helper\Arr;
 use madong\swagger\attribute\AllowAnonymous;
 use madong\swagger\helper\AnnotationHelper;
@@ -46,29 +47,40 @@ final class OperationMiddleware implements MiddlewareInterface
 
         $response = $handler($request);
 
-        // 检查是否需要记录操作日志（跳过匿名访问）
-        $allowAnonymous = AnnotationHelper::getMethodAnnotation($controllerClass, $action, AllowAnonymous::class);
-        if (!$allowAnonymous || $allowAnonymous->requirePermission) {
-            $logData = $this->buildLogData($request, $response, $firstOa);
-            $event = new OperationLogEvent(
-                $logData['name'],
-                $logData['oa_tags'],
-                $logData['oa_description'],
-                $logData['app'],
-                $logData['ip'],
-                $logData['ip_location'],
-                $logData['browser'],
-                $logData['os'],
-                $logData['url'],
-                $logData['class_name'],
-                $logData['action'],
-                $logData['method'],
-                $logData['param'],
-                $logData['result'],
-                $logData['user_name'],
-                $logData['user_id']
-            );
-            $event->dispatch();
+        // 操作日志属于旁路逻辑：业务响应已生成，日志构建/落库的任何异常都不允许
+        // 替换掉业务响应（否则会出现"业务已成功提交、前端却收到失败"的假失败）
+        try {
+            // 检查是否需要记录操作日志（跳过匿名访问）
+            $allowAnonymous = AnnotationHelper::getMethodAnnotation($controllerClass, $action, AllowAnonymous::class);
+            if (!$allowAnonymous || $allowAnonymous->requirePermission) {
+                $logData = $this->buildLogData($request, $response, $firstOa);
+                $event   = new OperationLogEvent(
+                    $logData['name'],
+                    $logData['oa_tags'],
+                    $logData['oa_description'],
+                    $logData['app'],
+                    $logData['ip'],
+                    $logData['ip_location'],
+                    $logData['browser'],
+                    $logData['os'],
+                    $logData['url'],
+                    $logData['class_name'],
+                    $logData['action'],
+                    $logData['method'],
+                    $logData['param'],
+                    $logData['result'],
+                    $logData['user_name'],
+                    $logData['user_id']
+                );
+                $event->dispatch();
+            }
+        } catch (\Throwable $e) {
+            Logger::error('[OperationMiddleware] 操作日志记录失败（不影响业务响应）', [
+                'url'   => $request->path(),
+                'error' => $e->getMessage(),
+                'file'  => $e->getFile(),
+                'line'  => $e->getLine(),
+            ]);
         }
 
         return $response;
