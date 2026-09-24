@@ -2041,6 +2041,19 @@
         "summary": "根据hash下载资源"
     },
     {
+        "code": "upload:files:access_urls",
+        "controller": "FilesController",
+        "method": "accessUrls",
+        "module": "adminapi",
+        "plugin": null,
+        "route": "\/adminapi\/system\/files\/access-urls",
+        "httpMethod": "POST",
+        "tags": [
+            "附件管理"
+        ],
+        "summary": "资源访问地址批量换取"
+    },
+    {
         "code": "upload:files:upload_image",
         "controller": "FilesController",
         "method": "uploadImage",
@@ -2834,6 +2847,34 @@
             "系统日志"
         ],
         "summary": "日志扫描根目录"
+    },
+    {
+        "code": "portal:upload:files:upload_image",
+        "description": "门户图片上传",
+        "controller": "FilesController",
+        "method": "uploadImage",
+        "module": "plugin",
+        "plugin": "portal",
+        "route": "\/plugin\/upload-image",
+        "httpMethod": "POST",
+        "tags": [
+            "门户-附件管理"
+        ],
+        "summary": "门户图片上传（自动归属 portal 命名空间）"
+    },
+    {
+        "code": "portal:upload:files:upload_file",
+        "description": "门户附件上传",
+        "controller": "FilesController",
+        "method": "uploadFile",
+        "module": "plugin",
+        "plugin": "portal",
+        "route": "\/plugin\/upload-file",
+        "httpMethod": "POST",
+        "tags": [
+            "门户-附件管理"
+        ],
+        "summary": "门户附件上传（自动归属 portal 命名空间）"
     },
     {
         "code": "portal:upload:files:wangeditor",
