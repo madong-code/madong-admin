@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace app\adminapi\controller\system;
 
 use app\adminapi\controller\Crud;
+use app\adminapi\CurrentUser;
 use app\adminapi\middleware\AccessTokenMiddleware;
 use app\adminapi\middleware\OperationMiddleware;
 use app\adminapi\middleware\PermissionMiddleware;
@@ -33,6 +34,7 @@ use madong\swagger\attribute\Permission;
 use OpenApi\Attributes as OA;
 use OpenApi\Attributes\RequestBody;
 use support\annotation\Middleware;
+use support\Container;
 use support\Request;
 use Webman\RedisQueue\Client;
 use WebmanTech\Swagger\DTO\SchemaConstants;
@@ -90,7 +92,26 @@ final class FilesController extends Crud
     #[SimpleResponse(schema: [], example: [])]
     public function destroy(Request $request): \support\Response
     {
-        return parent::destroy($request);
+        try {
+            // 删除附件会同时清理云 / 本地物理资源，不可恢复，需二次校验当前登录管理员密码
+            $password = (string)$request->input('password', '');
+            if ($password === '') {
+                throw new AdminException('请输入管理员密码');
+            }
+            $admin = Container::make(CurrentUser::class)->admin();
+            if (empty($admin) || !password_verify($password, (string)$admin->password)) {
+                throw new AdminException('管理员密码错误');
+            }
+
+            $ids = $this->getDeleteIds($request);
+            if (empty($ids)) {
+                throw new AdminException('删除参数不能为空');
+            }
+
+            return Json::success('ok', $this->service->removeWithStorage($ids));
+        } catch (\Throwable $e) {
+            return Json::fail($e->getMessage());
+        }
     }
 
     #[OA\Delete(
@@ -105,7 +126,7 @@ final class FilesController extends Crud
     #[SimpleResponse(schema: [], example: [])]
     public function batchDelete(Request $request): \support\Response
     {
-        return parent::destroy($request);
+        return $this->destroy($request);
     }
 
     #[OA\Post(
@@ -123,6 +144,12 @@ final class FilesController extends Crud
                     type: 'string',
                     example: 'https://example.com/image.jpg'
                 ),
+                new OA\Property(
+                    property: 'sub_dir',
+                    description: '子目录路径，例如：image/202603',
+                    type: 'string',
+                    example: 'image/202603'
+                ),
             ]
         )
     )]
@@ -131,7 +158,8 @@ final class FilesController extends Crud
     public function downloadNetworkImage(Request $request): \support\Response
     {
         $url    = $request->input('url', '');
-        $result = $this->service->saveNetworkImage($url);
+        $subDir = (string)$request->input('sub_dir', '');
+        $result = $this->service->saveNetworkImage($url, $subDir);
         return Json::success('操作成功', $result);
     }
 
@@ -235,6 +263,7 @@ final class FilesController extends Crud
             ),
         ]
     ), example: ['data' => [['key' => '/storage/avatar/202609/abc.png', 'url' => 'https://cdn.example.com/storage/avatar/202609/abc.png?e=1790157600&token=xxx']]])]
+    #[Permission(code: 'upload:files:access_urls')]
     #[AllowAnonymous(requireToken: false, requirePermission: false, description: '公共接口（仅签发可内联渲染的媒体，登录时携带身份）')]
     public function accessUrls(Request $request): \support\Response
     {
