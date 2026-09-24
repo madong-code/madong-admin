@@ -73,4 +73,25 @@ interface UploadFileInterface
      * @return bool 对象不存在（已删除）返回 false，删除成功返回 true
      */
     public function deleteFile(string $key): bool;
+
+    /**
+     * @desc: 判断存储对象是否存在
+     * - 驱动未实现时抛 UploadException，调用方需降级处理
+     *
+     * @param string $key 对象 key 或本空间域名下的绝对地址
+     *
+     * @return bool
+     */
+    public function exists(string $key): bool;
+
+    /**
+     * @desc: 列举存储对象 key（仅 key，不含分页细节）
+     * - 驱动未实现时抛 UploadException，调用方需降级处理
+     *
+     * @param string $prefix 只列举该前缀下的对象
+     * @param int    $limit  最多返回条数，0 表示不限
+     *
+     * @return array<int, string>
+     */
+    public function listObjects(string $prefix = '', int $limit = 0): array;
 }

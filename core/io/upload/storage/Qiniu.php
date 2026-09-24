@@ -65,7 +65,7 @@ class Qiniu extends BaseUpload
             try {
                 [$ret, $err] = $this->getInstance()->putFile($this->getUploadToken(), $object, $file->getPathname());
                 if ($err) {
-                    throw new UploadException((string)$err);
+                    throw new UploadException((string)$err->message());
                 }
                 $result[] = $temp;
             } catch (\Throwable $exception) {
@@ -84,7 +84,7 @@ class Qiniu extends BaseUpload
         }
 
         $uniqueId = hash_file('sha256', $file->getPathname());
-        $object   = $this->buildObjectKey($uniqueId . '.' . $file->getExtension(), $options);
+        $object   = $this->resolveTargetKey($uniqueId . '.' . $file->getExtension(), $options);
 
         $result = [
             'origin_name' => $file->getRealPath(),
@@ -97,12 +97,78 @@ class Qiniu extends BaseUpload
             'base_path'   => $this->dirSeparator . $object,
         ];
 
-        [$ret, $err] = $this->getInstance()->putFile($this->getUploadToken(), $object, $file->getPathname());
+        $token = $this->getUploadToken();
+        if ($file->getSize() === 0) {
+            // 零字节文件：SDK 的 putFile() 内部会执行 fread($file, 0) 而报错，改用二进制内容上传空对象
+            [$ret, $err] = $this->getInstance()->put($token, $object, '');
+        } else {
+            // putFile 在 >4MB 时自动切换分片上传，无需显式判断
+            [$ret, $err] = $this->getInstance()->putFile($token, $object, $file->getPathname());
+        }
         if ($err) {
-            throw new UploadException((string)$err);
+            throw new UploadException((string)$err->message());
         }
 
         return $result;
+    }
+
+    /**
+     * 判断云端对象是否存在
+     *
+     * @param string $key 对象 key 或本空间域名下的绝对地址
+     *
+     * @return bool
+     * @throws UploadException
+     */
+    public function exists(string $key): bool
+    {
+        $object = $this->normalizeObjectKey($key);
+        if ($object === null || $object === '') {
+            throw new UploadException('七牛资源 key 非法，无法检查对象是否存在: ' . $key);
+        }
+
+        [, $err] = $this->getBucketManager()->stat($this->config['bucket'], $object);
+
+        if ($err) {
+            // 612：文件不存在
+            if ((int)$err->code() === 612) {
+                return false;
+            }
+            throw new UploadException((string)$err->message());
+        }
+
+        return true;
+    }
+
+    /**
+     * 列举云端对象 key
+     *
+     * @param string $prefix 只列举该前缀下的对象
+     * @param int    $limit  最多返回条数，0 表示不限
+     *
+     * @return array<int, string>
+     * @throws UploadException
+     */
+    public function listObjects(string $prefix = '', int $limit = 0): array
+    {
+        $keys   = [];
+        $marker = null;
+
+        do {
+            $size = $limit > 0 ? min(1000, $limit - count($keys)) : 1000;
+            [$ret, $err] = $this->getBucketManager()->listFiles($this->config['bucket'], $prefix, $marker, $size);
+            if ($err) {
+                throw new UploadException((string)$err->message());
+            }
+
+            foreach ($ret['items'] ?? [] as $item) {
+                $keys[] = (string)$item['key'];
+            }
+
+            $marker = $ret['marker'] ?? null;
+        } while (!empty($marker) && ($limit === 0 || count($keys) < $limit));
+
+        return $keys;
     }
 
     /**
@@ -153,10 +219,10 @@ class Qiniu extends BaseUpload
         [$ret, $err] = $this->getBucketManager()->delete($this->config['bucket'], $object);
         if ($err) {
             // 612：文件不存在，按已删除处理
-            if ((int)($err->code ?? 0) === 612) {
+            if ((int)$err->code() === 612) {
                 return false;
             }
-            throw new UploadException((string)$err);
+            throw new UploadException((string)$err->message());
         }
 
         return true;
@@ -170,7 +236,7 @@ class Qiniu extends BaseUpload
 
         [$ret, $err] = $this->getInstance()->put($this->getUploadToken(), $object, base64_decode($base64[1]));
         if ($err) {
-            throw new UploadException((string)$err);
+            throw new UploadException((string)$err->message());
         }
 
         $imgLen   = strlen($base64[1]);

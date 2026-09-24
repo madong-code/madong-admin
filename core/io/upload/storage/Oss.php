@@ -152,7 +152,7 @@ class Oss extends BaseUpload
         }
 
         $uniqueId = hash_file('sha256', $file->getPathname());
-        $object = $this->buildObjectKey($uniqueId . '.' . $file->getExtension(), $options);
+        $object = $this->resolveTargetKey($uniqueId . '.' . $file->getExtension(), $options);
 
         $result = [
             'origin_name' => $file->getRealPath(),
@@ -172,6 +172,28 @@ class Oss extends BaseUpload
             throw new UploadException($exception->getMessage());
         }
         return $result;
+    }
+
+    /**
+     * 判断云端对象是否存在
+     *
+     * @param string $key 对象 key 或本空间域名下的绝对地址
+     *
+     * @return bool
+     * @throws UploadException
+     */
+    public function exists(string $key): bool
+    {
+        $object = $this->normalizeObjectKey($key);
+        if ($object === null || $object === '') {
+            throw new UploadException('OSS 资源 key 非法，无法检查对象是否存在: ' . $key);
+        }
+
+        try {
+            return $this->getInstance()->doesObjectExist($this->config['bucket'], $object);
+        } catch (OssException $exception) {
+            throw new UploadException($exception->getMessage());
+        }
     }
 
     /**

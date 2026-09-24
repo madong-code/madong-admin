@@ -191,6 +191,58 @@ abstract class BaseUpload implements UploadFileInterface
     }
 
     /**
+     * 解析本次上传的目标对象 key
+     *
+     * 默认按 {dirname}/{sub_dir}/{filename} 规则生成（filename 由各驱动按自身哈希策略给出）；
+     * 迁移 / 回填场景可通过 options.object_key 指定精确 key：历史文件的 key 不能改名，
+     * 否则数据库里的历史引用会全部失效。
+     *
+     * @param string $filename 驱动生成的默认文件名
+     * @param array  $options  上传 options（可含 object_key 指定精确 key）
+     *
+     * @return string
+     */
+    protected function resolveTargetKey(string $filename, array $options = []): string
+    {
+        $explicit = trim(str_replace('\\', '/', (string)($options['object_key'] ?? '')), '/');
+
+        return $explicit !== '' ? $explicit : $this->buildObjectKey($filename, $options);
+    }
+
+    /**
+     * 判断存储对象是否存在
+     *
+     * 默认未实现，由各驱动按自身协议实现；调用方应捕获 UploadException 并降级处理
+     * （例如退化为「直接覆盖上传」），不要假设所有驱动都支持。
+     *
+     * @param string $key 对象 key 或本空间域名下的绝对地址
+     *
+     * @return bool
+     * @throws UploadException 驱动未实现时抛出
+     */
+    public function exists(string $key): bool
+    {
+        throw new UploadException('当前存储驱动未实现对象存在性检查:' . static::class);
+    }
+
+    /**
+     * 列举存储对象 key
+     *
+     * 默认未实现，由各驱动按自身协议实现（云厂商列举接口差异较大，不做统一抽象，
+     * 未实现的驱动直接抛异常，由调用方降级）。仅返回对象 key，不分页细节。
+     *
+     * @param string $prefix 只列举该前缀下的对象
+     * @param int    $limit  最多返回条数，0 表示不限
+     *
+     * @return array<int, string>
+     * @throws UploadException 驱动未实现时抛出
+     */
+    public function listObjects(string $prefix = '', int $limit = 0): array
+    {
+        throw new UploadException('当前存储驱动未实现对象列举:' . static::class);
+    }
+
+    /**
      * 文件校验
      */
     protected function verify(): void
