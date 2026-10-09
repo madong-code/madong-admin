@@ -41,7 +41,11 @@ class Json
             }
         }
 
-        return new Response($defaultHttpCode, ['Content-Type' => 'application/json'], json_encode($res));
+        // JSON_INVALID_UTF8_SUBSTITUTE：外部数据源可能带回非法 UTF-8 字节，
+        // 编码失败会直接 500；替换为 U+FFFD 保证接口始终可用（数据完整性由源头保证）
+        $body = json_encode($res, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+
+        return new Response($defaultHttpCode, ['Content-Type' => 'application/json'], $body);
     }
 
     public static function success(string|array $msg = 'common.operation.success', mixed $data = [], ?array $replace = []): Response
@@ -62,6 +66,12 @@ class Json
         if (is_array($msg)) {
             $data = $msg;
             $msg  = 'common.operation.failed';
+        }
+
+        // code=0 是成功码；调用方常以 $e->getCode()（默认 0）透传，
+        // 会把业务异常变成假成功导致前端静默无反应，此处强制纠正
+        if ((int)$code === 0) {
+            $code = -1;
         }
 
         return self::make($code, $msg, $data, $replace);
