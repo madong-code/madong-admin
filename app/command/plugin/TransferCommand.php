@@ -37,7 +37,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * │ 3. 命令配置    —— configure() 参数/选项定义            │
  * │ 4. 入口        —— __invoke() 场景路由                 │
  * │ 5. 初始化      —— initPaths() 路径初始化              │
- * │ 6. 场景执行    —— 三个场景：backend / full / extract  │
+ * │ 6. 场景执行    —— 四个场景：backend / full / extract / resource │
  * │ 7. 工具方法    —— 递归拷贝 / 文件统计 / 结果汇总      │
  * └──────────────────────────────────────────────────────┘
  *
@@ -45,6 +45,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * │ php webman madong-plugin:transfer demo backend       │ 部署后端
  * │ php webman madong-plugin:transfer demo full          │ 完整部署三端
  * │ php webman madong-plugin:transfer demo extract       │ 提取到download
+ * │ php webman madong-plugin:transfer demo resource      │ 前端模板回写插件resource
  * └──────────────────────────────────────────────────────┘
  *
  * @author Mr.April
@@ -68,6 +69,7 @@ class TransferCommand extends BaseCommand
     private const WEB_DIR = '/template/web/src/plugin';                 // Web前端插件目录
     private const DL_ADMIN_TMPL = '/resource/template/admin';           // 下载包内admin模板路径
     private const DL_WEB_TMPL = '/resource/template/web';               // 下载包内web模板路径
+    private const PLUGIN_RES_TMPL = '/resource/template';               // 插件内前端模板根路径
 
     // ═══════════════════ 2. 属性 ═══════════════════════════
 
@@ -98,7 +100,7 @@ class TransferCommand extends BaseCommand
     {
         $this
             ->addArgument('name', InputArgument::REQUIRED, 'Plugin name (e.g. demo)')
-            ->addArgument('scenario', InputArgument::REQUIRED, 'Scenario: backend, full, extract')
+            ->addArgument('scenario', InputArgument::REQUIRED, 'Scenario: backend, full, extract, resource')
             ->addOption('source', 's', InputOption::VALUE_OPTIONAL, 'Custom source directory', null)
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force execution in playground/demo environment');
     }
@@ -116,9 +118,9 @@ class TransferCommand extends BaseCommand
         $force = (bool) $input->getOption('force');
 
         // 验证场景
-        $validScenarios = ['backend', 'full', 'extract'];
+        $validScenarios = ['backend', 'full', 'extract', 'resource'];
         if (!in_array($scenario, $validScenarios)) {
-            return $this->outputError($io, "Invalid scenario: '{$scenario}'. Allowed: backend, full, extract");
+            return $this->outputError($io, "Invalid scenario: '{$scenario}'. Allowed: backend, full, extract, resource");
         }
 
         // 演示/沙盒环境限制：所有场景都会写文件系统，默认禁止执行（除非 --force）
@@ -136,7 +138,7 @@ class TransferCommand extends BaseCommand
         // 初始化路径
         $this->initPaths($pluginName, $customSource);
 
-        $scenarioLabels = ['backend' => 'Deploy backend only', 'full' => 'Full deploy to all', 'extract' => 'Extract to download'];
+        $scenarioLabels = ['backend' => 'Deploy backend only', 'full' => 'Full deploy to all', 'extract' => 'Extract to download', 'resource' => 'Sync frontend to plugin resource'];
         $io->info(sprintf('Plugin: %s', $pluginName));
         $io->info(sprintf('Scenario: %s (%s)', $scenario, $scenarioLabels[$scenario]));
         $io->info(sprintf('Source: %s', $this->sourceDir));
@@ -144,6 +146,10 @@ class TransferCommand extends BaseCommand
 
         if ($scenario === 'extract') {
             return $this->scenarioExtract($io, $pluginName);
+        }
+
+        if ($scenario === 'resource') {
+            return $this->scenarioResource($io, $pluginName);
         }
 
         // backend/full：检查源目录
@@ -286,6 +292,54 @@ class TransferCommand extends BaseCommand
         // 结果汇总
         $io->success(sprintf("Plugin '%s' extracted to download/%s/", $pluginName, $pluginName));
         $io->writeln('  <comment>Download package is ready for private repo submission.</comment>');
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * 场景 resource：开发时把前端模板回写到插件 resource
+     *
+     * 开发期前端代码在 template/{admin|web}/src/plugin/{name} 中维护，
+     * 该场景将其逆向同步回 backend/plugin/{name}/resource/template/{admin|web}，
+     * 保持插件仓库（安装分发源）与前端实际代码一致：
+     *   template/admin/src/plugin/{name}/ → backend/plugin/{name}/resource/template/admin/
+     *   template/web/src/plugin/{name}/   → backend/plugin/{name}/resource/template/web/
+     */
+    private function scenarioResource(SymfonyStyle $io, string $pluginName): int
+    {
+        $io->section('Scenario: Sync Frontend Templates to Plugin Resource');
+
+        // 插件仓库必须已存在于后端（resource 是其子目录）
+        if (!is_dir($this->backendDir)) {
+            return $this->outputError($io, sprintf('Backend plugin not found: %s', $this->backendDir));
+        }
+
+        $hasAny = false;
+
+        // 1. Admin 前端 → 插件 resource/template/admin（先清理残留再拷贝）
+        if (is_dir($this->adminDir)) {
+            $this->copyDirectory($io, $this->adminDir, $this->backendDir . self::PLUGIN_RES_TMPL . '/admin', 'Admin frontend → plugin resource', clean: true);
+            $hasAny = true;
+        } else {
+            $io->warning(sprintf('No admin frontend in project, skipped: %s', $this->adminDir));
+        }
+        $io->newLine();
+
+        // 2. Web 前端 → 插件 resource/template/web
+        if (is_dir($this->webDir)) {
+            $this->copyDirectory($io, $this->webDir, $this->backendDir . self::PLUGIN_RES_TMPL . '/web', 'Web frontend → plugin resource', clean: true);
+            $hasAny = true;
+        } else {
+            $io->warning(sprintf('No web frontend in project, skipped: %s', $this->webDir));
+        }
+        $io->newLine();
+
+        if (!$hasAny) {
+            return $this->outputError($io, sprintf('No frontend plugin directories found for plugin: %s', $pluginName));
+        }
+
+        $io->success(sprintf("Plugin '%s' frontend templates synced to resource/template/!", $pluginName));
+        $io->writeln('  <comment>Plugin repo is now in sync with the live frontend code.</comment>');
 
         return self::SUCCESS;
     }
