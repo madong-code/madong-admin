@@ -18,6 +18,8 @@ return [
     'website'      => '',
     'icon'         => '',
     'cover'        => '',
+    // 前置插件依赖，安装时校验其 config/installed.php，任一未安装即阻断安装
+    // string 单依赖：'pay'   |   array 多依赖：['pay', 'portal']   |   空串：无依赖
     'support_app'  => '',
     'status'       => 1,
     'uninstall'    => [

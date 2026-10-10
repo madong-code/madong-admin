@@ -149,7 +149,7 @@ class PluginDevelopService extends BaseService
             'status'     => 1,
             'icon'       => $data['icon'] ?? '',
             'cover'      => $data['cover'] ?? '',
-            'support_app' => $data['support_app'] ?? '',
+            'support_app' => $this->normalizeSupportAppForDb($data['support_app'] ?? ''),
         ];
 
         return $this->dao->save($insertData);
@@ -291,7 +291,7 @@ class PluginDevelopService extends BaseService
                 'status'      => $info['status'] ?? 1,
                 'icon'        => $info['icon'] ?? '',
                 'cover'       => $info['cover'] ?? '',
-                'support_app' => $info['support_app'] ?? 'admin',
+                'support_app' => $this->normalizeSupportAppForDb($info['support_app'] ?? 'admin'),
             ];
 
             if ($existing) {
@@ -823,5 +823,25 @@ VUE
             ],
         ];
         file_put_contents($infoFile, '<?php return ' . var_export($info, true) . ';');
+    }
+
+    /**
+     * 归一化 support_app 声明为可落库的逗号分隔字符串
+     *
+     * info.php 支持两种声明模式：
+     *   'pay'             → 'pay'
+     *   ['pay', 'portal'] → 'pay,portal'
+     * 数组项过滤非字符串与空串，异常声明不抛错。
+     */
+    private function normalizeSupportAppForDb(mixed $value): string
+    {
+        if (empty($value)) {
+            return '';
+        }
+
+        $items = is_array($value) ? $value : [$value];
+        $items = array_filter($items, fn ($item) => is_string($item) && $item !== '');
+
+        return implode(',', array_values(array_unique($items)));
     }
 }

@@ -400,27 +400,31 @@ final class PluginInstallService extends PluginBaseService
                 ];
             }
 
-            // 4. 插件依赖检查（检查 installed.php 文件）
-            if (isset($pluginConfig['support_app']) && !empty($pluginConfig['support_app']) && $pluginConfig['support_app'] != $name) {
-                $supportAppCode = $pluginConfig['support_app'];
+            // 4. 插件依赖检查（支持 string 单依赖 / array 多依赖两种声明模式）
+            foreach ($this->normalizeSupportApps($pluginConfig['support_app'] ?? '') as $supportAppCode) {
+                // 自引用依赖无意义，跳过
+                if ($supportAppCode === $name) {
+                    continue;
+                }
+
                 $supportAppDir = $this->plugin_path . DIRECTORY_SEPARATOR . $supportAppCode;
                 $supportAppInstalledFile = $supportAppDir . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'installed.php';
 
                 if (!is_file($supportAppInstalledFile)) {
                     $supportAppConfig = $this->getPluginConfig($supportAppCode);
-                    $supportAppTitle = empty($supportAppConfig) ? $supportAppCode : $supportAppConfig['title'];
+                    $supportAppTitle = $supportAppConfig['title'] ?? $supportAppCode;
 
                     $checks[] = [
                         'type'             => 'dependency',
                         'name'             => '插件依赖检查',
-                        'description'      => '检查插件依赖的主应用是否已安装',
+                        'description'      => '检查插件依赖的前置插件是否已安装',
                         'dependency_name'  => $supportAppCode,
                         'dependency_title' => $supportAppTitle,
                         'status'           => 'error',
                         'message'          => "依赖插件未安装",
                         'exception'        => [
                             'type'    => 'DependencyNotFoundException',
-                            'message' => $pluginConfig['title'] . '插件的主应用' . $supportAppTitle . '插件还未安装，请先安装主应用',
+                            'message' => ($pluginConfig['title'] ?? $name) . '插件的前置插件 ' . $supportAppTitle . ' 还未安装，请先安装',
                         ],
                     ];
                 } else {
@@ -484,10 +488,10 @@ final class PluginInstallService extends PluginBaseService
 
         if ($errorCount > 0) {
             $result['overall_status'] = 'error';
-            $result['message']        = "检查失败，发现{$errorCount}个错误";
+            $result['message']        = "检查失败，发现{$errorCount}个错误：" . $this->summarizeChecks($checks, 'error');
         } elseif ($warningCount > 0) {
             $result['overall_status'] = 'warning';
-            $result['message']        = "检查通过但有{$warningCount}个警告";
+            $result['message']        = "检查通过但有{$warningCount}个警告：" . $this->summarizeChecks($checks, 'warning');
         } else {
             $result['overall_status'] = 'success';
             $result['message']        = "所有检查通过";
@@ -499,4 +503,44 @@ final class PluginInstallService extends PluginBaseService
         return $result;
     }
 
+    /**
+     * 聚合指定状态的检查项原因（取异常详情，缺省取消息），分号连接
+     *
+     * @param array  $checks 检查行集合
+     * @param string $status 过滤的状态（error / warning）
+     */
+    private function summarizeChecks(array $checks, string $status): string
+    {
+        $messages = [];
+        foreach ($checks as $check) {
+            if (($check['status'] ?? '') !== $status) {
+                continue;
+            }
+            $messages[] = $check['exception']['message'] ?? $check['message'] ?? '';
+        }
+
+        return implode('；', array_filter($messages));
+    }
+
+    /**
+     * 归一化 support_app 声明为前置插件代码数组
+     *
+     * 支持 string / array 两种声明模式（info.php）：
+     *   'pay'                → ['pay']
+     *   'pay,portal'         → ['pay', 'portal']
+     *   ['pay', 'portal']    → ['pay', 'portal']
+     *   '' / null / []       → []（跳过依赖检查）
+     * 数组项过滤非字符串与空串，异常声明不抛错。
+     */
+    private function normalizeSupportApps(mixed $value): array
+    {
+        if (empty($value)) {
+            return [];
+        }
+
+        $items = is_array($value) ? $value : preg_split('/\s*,\s*/', trim((string) $value), -1, PREG_SPLIT_NO_EMPTY);
+        $items = array_filter($items, fn ($item) => is_string($item) && $item !== '');
+
+        return array_values(array_unique($items));
+    }
 }
