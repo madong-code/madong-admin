@@ -48,6 +48,22 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * │ php webman madong-plugin:transfer demo resource      │ 前端模板回写插件resource
  * └──────────────────────────────────────────────────────┘
  *
+ * ┌─ 额外前端端点（h5/uniapp 等）────────────────────────┐
+ * │ resource / full 场景默认只处理 admin/web 两个内置端； │
+ * │ 插件自带独立前端时，在插件 config/info.php 中声明：    │
+ * │   'template' => ['cms' => 'template/cms/src/plugin'] │
+ * │ （端点名 => 项目内路径前缀，与框架 appConfig 及        │
+ * │  Install.php resolveExtraTarget() 同一约定，          │
+ * │  缺省 template/{endpoint}/src/plugin）                │
+ * │ 命令按 {前缀}/{插件名} 识别源目录并同步：              │
+ * │   resource: template/cms/src/plugin/{name}            │
+ * │           → backend/plugin/{name}/resource/template/{endpoint} │
+ * │   full:    download/{name}/resource/template/{endpoint}│
+ * │           → template/cms/src/plugin/{name}            │
+ * │ 注意：仅同步插件子树，子树外文件（pages.json 注册、    │
+ * │ locale 等）不参与同步，与 admin/web 既有边界一致。     │
+ * └──────────────────────────────────────────────────────┘
+ *
  * @author Mr.April
  * @since 1.0.0
  */
@@ -94,6 +110,12 @@ class TransferCommand extends BaseCommand
     /** 下载包内的 web 模板目录 */
     private string $dlWebTmpl;
 
+    /** info.php 声明的额外前端端点（端点名 => 项目内路径前缀） */
+    private array $extraEndpoints = [];
+
+    /** 插件内模板资源根（info.php resource.template，缺省 template） */
+    private string $resourceBase = 'template';
+
     // ═══════════════ 3. 命令配置 ═══════════════════════════
 
     protected function configure(): void
@@ -138,6 +160,9 @@ class TransferCommand extends BaseCommand
         // 初始化路径
         $this->initPaths($pluginName, $customSource);
 
+        // 读取 info.php 的额外端点声明（无声明时仅处理 admin/web）
+        $this->loadExtraEndpoints($io, $pluginName);
+
         $scenarioLabels = ['backend' => 'Deploy backend only', 'full' => 'Full deploy to all', 'extract' => 'Extract to download', 'resource' => 'Sync frontend to plugin resource'];
         $io->info(sprintf('Plugin: %s', $pluginName));
         $io->info(sprintf('Scenario: %s (%s)', $scenario, $scenarioLabels[$scenario]));
@@ -175,7 +200,7 @@ class TransferCommand extends BaseCommand
      */
     private function initPaths(string $pluginName, ?string $customSource): void
     {
-        $this->projectRoot = dirname(base_path());
+        $this->projectRoot = rtrim(dirname(base_path()), '/\\');
 
         $this->sourceDir = $customSource
             ? rtrim($customSource, '/\\')
@@ -185,6 +210,73 @@ class TransferCommand extends BaseCommand
         $this->webDir = $this->projectRoot . self::WEB_DIR . '/' . $pluginName;
         $this->dlAdminTmpl = $this->sourceDir . self::DL_ADMIN_TMPL;
         $this->dlWebTmpl = $this->sourceDir . self::DL_WEB_TMPL;
+    }
+
+    /**
+     * 读取插件 info.php 的额外前端端点声明与资源根
+     *
+     * 约定与框架 appConfig（core/business/config/plugin.php）及
+     * Install.php resolveExtraTarget() 同构：
+     *   'template' => ['cms' => 'template/cms/src/plugin']  // 端点名 => 项目内路径前缀
+     *   'resource' => ['template' => 'template']            // 插件内资源根（缺省 template）
+     *
+     * 内置端 admin/web 由本命令默认处理，声明中忽略；
+     * 异常声明逐项 warning 跳过，不中断。
+     */
+    private function loadExtraEndpoints(SymfonyStyle $io, string $pluginName): void
+    {
+        $this->extraEndpoints = [];
+        $this->resourceBase = 'template';
+
+        $infoFile = $this->backendDir . '/config/info.php';
+        if (!is_file($infoFile)) {
+            return;
+        }
+
+        $loaded = @include $infoFile;
+        if (!is_array($loaded)) {
+            $io->warning(sprintf('Invalid plugin info file (not an array), extra endpoints ignored: %s', $infoFile));
+            return;
+        }
+
+        // 插件内资源根（与 Install.php 的 resourceBase 一致）
+        $resourceBase = $loaded['resource']['template'] ?? null;
+        if (is_string($resourceBase) && $resourceBase !== '' && !str_contains($resourceBase, '..')) {
+            $this->resourceBase = rtrim($resourceBase, '/\\');
+        }
+
+        // 额外端点声明
+        $declared = $loaded['template'] ?? null;
+        if ($declared === null) {
+            return;
+        }
+        if (!is_array($declared)) {
+            $io->warning(sprintf(
+                "Plugin info 'template' must be an array (endpoint => path prefix), got %s. Extra endpoints ignored.",
+                gettype($declared)
+            ));
+            return;
+        }
+
+        foreach ($declared as $endpoint => $pathBase) {
+            if (!is_string($endpoint) || !preg_match('/^[A-Za-z0-9_-]+$/', $endpoint)) {
+                $io->warning(sprintf('Invalid endpoint name in info.php template declaration, skipped: %s', var_export($endpoint, true)));
+                continue;
+            }
+            if (in_array(strtolower($endpoint), ['admin', 'web'], true)) {
+                $io->writeln(sprintf('  <comment>ℹ Endpoint "%s" is handled by default, declaration ignored.</comment>', $endpoint));
+                continue;
+            }
+            if (!is_string($pathBase) || $pathBase === '') {
+                $pathBase = 'template/' . $endpoint . '/src/plugin';
+            }
+            $pathBase = rtrim(str_replace('\\', '/', $pathBase), '/');
+            if (str_starts_with($pathBase, '/') || preg_match('#^[A-Za-z]:#', $pathBase) || str_contains($pathBase, '..')) {
+                $io->warning(sprintf('Unsafe path for endpoint "%s" in info.php template declaration, skipped: %s', $endpoint, $pathBase));
+                continue;
+            }
+            $this->extraEndpoints[$endpoint] = $pathBase;
+        }
     }
 
     // ═══════════════ 6. 场景执行 ═══════════════════════════
@@ -243,6 +335,18 @@ class TransferCommand extends BaseCommand
         }
         $io->newLine();
 
+        // 4. 额外端点：download/resource/{resourceBase}/{endpoint} → 声明路径（对称于 admin/web）
+        foreach ($this->extraEndpoints as $endpoint => $pathBase) {
+            $source = $this->sourceDir . '/resource/' . $this->resourceBase . '/' . $endpoint;
+            if (is_dir($source)) {
+                $target = $this->projectRoot . '/' . $pathBase . '/' . $pluginName;
+                $this->copyDirectory($io, $source, $target, ucfirst($endpoint) . ' frontend');
+            } else {
+                $io->warning(sprintf('No %s template in download, skipped: %s', $endpoint, $source));
+            }
+            $io->newLine();
+        }
+
         // 结果汇总
         $this->printSummary($io);
 
@@ -272,6 +376,20 @@ class TransferCommand extends BaseCommand
             $io->warning(sprintf('Backend plugin not found: %s', $this->backendDir));
         }
         $io->newLine();
+
+        // 1.1 额外端点资源完整性检查：插件 resource/{resourceBase}/{endpoint} 随后端整包带出，
+        //     缺失说明插件仓库未做 resource 回写，静默导出会产生不完整交付包
+        foreach ($this->extraEndpoints as $endpoint => $pathBase) {
+            $resourceDir = $this->backendDir . '/resource/' . $this->resourceBase . '/' . $endpoint;
+            if (!is_dir($resourceDir)) {
+                $io->warning(sprintf(
+                    'Extra endpoint "%s" resource missing in plugin repo: %s — run "madong-plugin:transfer %s resource" first, otherwise the package cannot deploy this endpoint.',
+                    $endpoint,
+                    $resourceDir,
+                    $pluginName
+                ));
+            }
+        }
 
         // 2. Admin 前端 → download/resource/template/admin
         if (is_dir($this->adminDir)) {
@@ -333,6 +451,18 @@ class TransferCommand extends BaseCommand
             $io->warning(sprintf('No web frontend in project, skipped: %s', $this->webDir));
         }
         $io->newLine();
+
+        // 3. 额外端点：声明路径/{pluginName} → 插件 resource/{resourceBase}/{endpoint}
+        foreach ($this->extraEndpoints as $endpoint => $pathBase) {
+            $source = $this->projectRoot . '/' . $pathBase . '/' . $pluginName;
+            if (is_dir($source)) {
+                $this->copyDirectory($io, $source, $this->backendDir . '/resource/' . $this->resourceBase . '/' . $endpoint, ucfirst($endpoint) . ' frontend → plugin resource', clean: true);
+                $hasAny = true;
+            } else {
+                $io->warning(sprintf('No %s frontend in project, skipped: %s', $endpoint, $source));
+            }
+            $io->newLine();
+        }
 
         if (!$hasAny) {
             return $this->outputError($io, sprintf('No frontend plugin directories found for plugin: %s', $pluginName));
@@ -477,6 +607,11 @@ class TransferCommand extends BaseCommand
             ['Admin FE', $this->adminDir],
             ['Web FE', $this->webDir],
         ];
+
+        // 额外端点按声明路径展示
+        foreach ($this->extraEndpoints as $endpoint => $pathBase) {
+            $summary[] = [ucfirst($endpoint) . ' FE', $this->projectRoot . '/' . $pathBase];
+        }
 
         $rows = [];
         foreach ($summary as [$label, $path]) {
