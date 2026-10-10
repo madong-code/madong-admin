@@ -17,10 +17,14 @@ public/*
 !public/logo.png
 !public/upload/logo.png
 
-# 忽略 plugin目录下除了example,demo除外
+# 忽略 plugin目录下除了example除外（demo 等插件改为用户按需安装，不随主仓库分发）
 plugin/*
-!plugin/example/
-!plugin/demo/
+
+
+# 本地临时与证书文件
+/.tmp/
+/tmp-certs/
+/runtimecerts*.pem
 
 # 本地包目录（引擎已改 composer VCS 安装，不随主仓库管理）
 /packages/
