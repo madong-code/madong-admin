@@ -1,4 +1,23 @@
-# madong 极速后台开发框架
+<div align="center">
+
+<img src="public/logo.png" alt="Madong Logo" width="120" />
+
+# Madong 极速后台开发框架
+
+基于 PHP Webman 的高性能后台开发平台
+
+[![PHP](https://img.shields.io/badge/PHP-8.2~8.4-777BB4?logo=php&logoColor=white)](https://www.php.net)
+[![Webman](https://img.shields.io/badge/Webman-2.2-2488C9)](https://www.workerman.net/doc/webman)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0+-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com)
+[![Redis](https://img.shields.io/badge/Redis-7.0+-DC382D?logo=redis&logoColor=white)](https://redis.io)
+[![License](https://img.shields.io/badge/License-Apache--2.0-blue)](./LICENSE)
+
+[![Docs](https://img.shields.io/badge/文档-madong.tech-7C3AED)](https://madong.tech)
+[![Demo](https://img.shields.io/badge/演示-v5.madong.tech-10B981)](http://v5.madong.tech/admin)
+
+**中文** | [English](./README.en.md)
+
+</div>
 
 ## 介绍
 
