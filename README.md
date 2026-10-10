@@ -185,7 +185,7 @@ php webman madong-download:frontend -f
 
 1. 从 GitHub 仓库下载：
    - 管理后台：https://github.com/madong-code/madong-admin（template/admin）
-   - 前台：https://github.com/madong-code/madong-web（template/web）
+   - 前台：https://github.com/madong-code/web-nuxt（template/web）
 
 2. 解压后将代码放置到项目根目录：
    ```
@@ -324,7 +324,7 @@ return [
 
 madong 提供一套面向 AI 编码助手的 Skills 技能包，覆盖后端、前端与跨端场景，帮助自动化完成模块开发、代码生成、CRUD 脚手架等任务。
 
-- **仓库地址**：https://github.com/madong-code/madong-skills
+- **仓库地址**：https://github.com/madong-code/madong-admin-skills
 - **目录结构**：
   - `backend/`：后端开发技能（控制器 / 服务 / DAO / 迁移等脚手架）
   - `frontend/`：前端开发技能（页面 / 表单 / 列表脚手架）
@@ -337,7 +337,7 @@ madong 提供一套面向 AI 编码助手的 Skills 技能包，覆盖后端、�
 
 ## 如何贡献
 
-非常欢迎你的加入！[提一个 Issue](https://github.com/madong-code/madong/issues) 或者提交一个 Pull Request。
+非常欢迎你的加入！[提一个 Issue](https://github.com/madong-code/madong-admin/issues) 或者提交一个 Pull Request。
 
 **Pull Request:**
 

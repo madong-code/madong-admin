@@ -185,7 +185,7 @@ If Git is not installed or the command cannot be used, download the front-end co
 
 1. Get the front-end repositories from GitHub:
    - Admin: https://github.com/madong-code/madong-admin (template/admin)
-   - Site:  https://github.com/madong-code/madong-web (template/web)
+   - Site:  https://github.com/madong-code/web-nuxt (template/web)
 
 2. After extracting, place the code under the project root:
    ```
@@ -323,7 +323,7 @@ Password: 123456
 
 Madong ships a set of **Skills** for AI coding assistants, covering backend, front-end and cross-platform scenarios to automate module development, code generation and CRUD scaffolding.
 
-- **Repository**: https://github.com/madong-code/madong-skills
+- **Repository**: https://github.com/madong-code/madong-admin-skills
 - **Structure**:
   - `backend/`: backend skills (controller / service / DAO / migration scaffolding)
   - `frontend/`: front-end skills (page / form / list scaffolding)
@@ -336,7 +336,7 @@ Report bugs or suggest improvements in the community: http://www.madong.tech
 
 ## Contributing
 
-Contributions are very welcome! [Open an Issue](https://github.com/madong-code/madong/issues) or submit a Pull Request.
+Contributions are very welcome! [Open an Issue](https://github.com/madong-code/madong-admin/issues) or submit a Pull Request.
 
 **Pull Request:**
 
