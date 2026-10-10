@@ -267,7 +267,7 @@ return [
 
 ## 系统演示
 
-管理后台： http://demo.madong.tech 
+管理后台： http://v5.madong.tech 
 账号：admin 
 密码：123456
 

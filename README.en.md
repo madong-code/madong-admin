@@ -266,7 +266,7 @@ After starting the service, the API can be explored by:
 
 ## Live Demo
 
-Admin panel: http://demo.madong.tech
+Admin panel: http://v5.madong.tech/admin
 Account: admin
 Password: 123456
 
