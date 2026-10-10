@@ -44,7 +44,7 @@ return [
             "seo_description"      => "",
             "copyright"            => "",
             "icp"                  => "",
-            "icp_url"              => "https:\/\/beian.miit.gov.cn",
+            "icp_url"              => "https://beian.miit.gov.cn",
             "network_security"     => "",
             "network_security_url" => "",
         ],
@@ -135,7 +135,7 @@ return [
         'content'    => [
             'root'                => 'public',
             'dirname'             => 'upload',
-            'domain'              => 'http://127.0.0.1:8001',
+            'domain'              => 'http://127.0.0.1:8500',
         ],
         'is_sys'     => 1,
         'enabled'    => 1,
