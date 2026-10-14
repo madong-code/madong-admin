@@ -25,21 +25,21 @@ Madong 是基于 PHP **Webman** 框架开发的极速开发平台，为前端应
 
 > 前后端分离部署，前端目录需单独下载或创建。
 
-## 双前端 UI 与仓库
+## 仓库地址
 
-Madong 支持 **双前端 UI**：管理后台提供两套可选 UI（Single / Aura），前台站点与多租户版共用同一前端。**默认从 GitHub 拉取**，如网络受限，可将表格中的 GitHub 路径替换为等价镜像仓库路径。
+Madong 支持 **双前端 UI**：管理后台提供两套可选 UI（Single / Aura），前台站点与多租户版共用同一前端。**默认从 GitHub 拉取**，网络受限时可改用 Gitee / GitCode 镜像。
 
-| 模块 | 类型 | 默认仓库（GitHub） | 其它镜像 |
+| 模块 | GitHub | Gitee 镜像 | GitCode 镜像 |
 | :--- | :--- | :--- | :--- |
-| 🖥️ 后台 Admin · Single | 管理后台前端 · 可选 UI 一（`template/admin`） | [madong-code/madong-single](https://github.com/madong-code/madong-single) | 可替换为自定义镜像仓库 |
-| 🖥️ 后台 Admin · Aura | 管理后台前端 · 可选 UI 二（`template/admin`） | [madong-code/madong-aura](https://github.com/madong-code/madong-aura) | 可替换为自定义镜像仓库 |
-| 🌐 前台 Web | 前台站点前端（`template/web`，与多租户版共用） | [madong-code/web-nuxt](https://github.com/madong-code/web-nuxt) | 可替换为自定义镜像仓库 |
-| 🤖 Skills | AI 开发技能包 | [madong-code/madong-admin-skills](https://github.com/madong-code/madong-admin-skills) | 可替换为自定义镜像仓库 |
+| 服务端 | https://github.com/madong-code/madong-admin | https://gitee.com/motion-code/madong-admin | https://gitcode.com/motion-code/madong-admin |
+| Admin(single) | https://github.com/madong-code/madong-single | https://gitee.com/motion-code/madong-single | https://gitcode.com/motion-code/madong-single |
+| Admin(aura) | https://github.com/madong-code/madong-aura | https://gitee.com/motion-code/madong-aura | https://gitcode.com/motion-code/madong-aura |
+| Web | https://github.com/madong-code/web-nuxt | https://gitee.com/motion-code/web-nuxt | https://gitcode.com/motion-code/web-nuxt |
+| Skills | https://github.com/madong-code/madong-admin-skills | https://gitee.com/motion-code/madong-admin-skills | https://gitcode.com/motion-code/madong-admin-skills |
 
+> Gitee / GitCode 镜像仓库位于 `motion-code/…` 组织下，与 GitHub 同名同路径，如实际地址不同请自行替换。
 > 后台两套 UI 任选其一放入 `template/admin`；前台使用 `web-nuxt`，与多租户版共用。
-> 表格中的「默认仓库」即提交给安装 / 下载命令的 GitHub 路径。例如下载后台：
-> `php webman madong-download:frontend --admin` 会默认从上述 GitHub 仓库拉取；
-> 如需镜像，可配置 `dependencies.npm.registry` 等镜像源，或直接指定镜像仓库地址。
+> 安装 / 下载命令默认从 GitHub 拉取，例如 `php webman madong-download:frontend --admin`；如需镜像，可配置 `dependencies.npm.registry` 等镜像源，或直接指定镜像仓库地址。
 
 ## 技术栈
 
@@ -112,7 +112,7 @@ php webman madong-download:frontend -b develop      # 指定分支
 php webman madong-download:frontend -f              # 强制覆盖
 ```
 
-**方式二：手动下载**——从「双前端 UI 与仓库」表格中的 GitHub 地址克隆，后台任选一套 UI 放入 `template/admin`，前台放入 `template/web`。
+**方式二：手动下载**——从「双前端 UI 仓库地址」表格中的 GitHub 地址克隆，后台任选一套 UI 放入 `template/admin`，前台放入 `template/web`。
 
 ### 4. 启动安装向导
 

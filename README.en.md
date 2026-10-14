@@ -25,21 +25,21 @@ Madong is a blazing-fast development platform built on the PHP **Webman** framew
 
 > The front end and back end are deployed separately. The front-end directory must be downloaded or created separately.
 
-## Dual Front-End UI & Repositories
+## Dual Front-End UI Repository Addresses
 
-Madong supports **dual front-end UIs**: the admin panel offers two selectable UIs (Single / Aura), and the site front-end is shared with the multi-tenant edition. **Pull from GitHub by default**; if the network is restricted, replace the GitHub path in the table with an equivalent mirror repository.
+Madong supports **dual front-end UIs**: the admin panel offers two selectable UIs (Single / Aura), and the site front-end is shared with the multi-tenant edition. **Pull from GitHub by default**; switch to the Gitee / GitCode mirrors if the network is restricted.
 
-| Module | Type | Default Repository (GitHub) | Other Mirrors |
+| Module | GitHub | Gitee Mirror | GitCode Mirror |
 | :--- | :--- | :--- | :--- |
-| 🖥️ Admin · Single | Admin front-end · UI option 1 (`template/admin`) | [madong-code/madong-single](https://github.com/madong-code/madong-single) | Replaceable with a custom mirror |
-| 🖥️ Admin · Aura | Admin front-end · UI option 2 (`template/admin`) | [madong-code/madong-aura](https://github.com/madong-code/madong-aura) | Replaceable with a custom mirror |
-| 🌐 Web | Site front-end (`template/web`, shared with the multi-tenant edition) | [madong-code/web-nuxt](https://github.com/madong-code/web-nuxt) | Replaceable with a custom mirror |
-| 🤖 Skills | AI development skills | [madong-code/madong-admin-skills](https://github.com/madong-code/madong-admin-skills) | Replaceable with a custom mirror |
+| Server | https://github.com/madong-code/madong-admin | https://gitee.com/motion-code/madong-admin | https://gitcode.com/motion-code/madong-admin |
+| Admin(single) | https://github.com/madong-code/madong-single | https://gitee.com/motion-code/madong-single | https://gitcode.com/motion-code/madong-single |
+| Admin(aura) | https://github.com/madong-code/madong-aura | https://gitee.com/motion-code/madong-aura | https://gitcode.com/motion-code/madong-aura |
+| Web | https://github.com/madong-code/web-nuxt | https://gitee.com/motion-code/web-nuxt | https://gitcode.com/motion-code/web-nuxt |
+| Skills | https://github.com/madong-code/madong-admin-skills | https://gitee.com/motion-code/madong-admin-skills | https://gitcode.com/motion-code/madong-admin-skills |
 
+> The Gitee / GitCode mirrors live under the `motion-code/…` org, same repo names as GitHub; adjust if the actual address differs.
 > Pick either Admin UI for `template/admin`; the site uses `web-nuxt`, shared with the multi-tenant edition.
-> The "Default Repository" in the table is the GitHub path submitted to the install / download commands. For example, downloading the admin:
-> `php webman madong-download:frontend --admin` pulls from the GitHub repo above by default;
-> for mirrors, configure `dependencies.npm.registry` etc., or specify a mirror repository address directly.
+> Install / download commands pull from GitHub by default, e.g. `php webman madong-download:frontend --admin`; for mirrors, configure `dependencies.npm.registry` etc., or specify a mirror repository address directly.
 
 ## Tech Stack
 
@@ -112,7 +112,7 @@ php webman madong-download:frontend -b develop      # specific branch
 php webman madong-download:frontend -f              # force overwrite
 ```
 
-**Option B: Manual download** — clone from the GitHub URLs in the "Dual Front-End UI & Repositories" table; pick either Admin UI into `template/admin`, and the site into `template/web`.
+**Option B: Manual download** — clone from the GitHub URLs in the "Dual Front-End UI Repository Addresses" table; pick either Admin UI into `template/admin`, and the site into `template/web`.
 
 ### 4. Launch the installer
 
