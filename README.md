@@ -4,7 +4,7 @@
 
 # Madong 极速后台开发框架
 
-基于 PHP Webman 的高性能后台开发平台
+基于 PHP Webman 的高性能后台开发平台，采用 **前后端分离 + 双前端** 架构
 
 [![PHP](https://img.shields.io/badge/PHP-8.2~8.4-777BB4?logo=php&logoColor=white)](https://www.php.net)
 [![Webman](https://img.shields.io/badge/Webman-2.2-2488C9)](https://www.workerman.net/doc/webman)
@@ -21,185 +21,100 @@
 
 ## 介绍
 
-基于 PHP Webman 框架开发的极速开发平台，为前端应用提供稳定、高效的 API 服务。
+Madong 是基于 PHP **Webman** 框架开发的极速开发平台，为前端应用提供稳定、高效的 API 服务。后端采用清晰的业务分层架构与插件系统；前端支持 **双前端 UI**——后台提供两套可选 Admin UI（Single / Aura），前台站点（Web）独立部署、与多租户版共用。
+
+> 前后端分离部署，前端目录需单独下载或创建。
+
+## 双前端 UI 与仓库
+
+Madong 支持 **双前端 UI**：管理后台提供两套可选 UI（Single / Aura），前台站点与多租户版共用同一前端。**默认从 GitHub 拉取**，如网络受限，可将表格中的 GitHub 路径替换为等价镜像仓库路径。
+
+| 模块 | 类型 | 默认仓库（GitHub） | 其它镜像 |
+| :--- | :--- | :--- | :--- |
+| 🖥️ 后台 Admin · Single | 管理后台前端 · 可选 UI 一（`template/admin`） | [madong-code/madong-single](https://github.com/madong-code/madong-single) | 可替换为自定义镜像仓库 |
+| 🖥️ 后台 Admin · Aura | 管理后台前端 · 可选 UI 二（`template/admin`） | [madong-code/madong-aura](https://github.com/madong-code/madong-aura) | 可替换为自定义镜像仓库 |
+| 🌐 前台 Web | 前台站点前端（`template/web`，与多租户版共用） | [madong-code/web-nuxt](https://github.com/madong-code/web-nuxt) | 可替换为自定义镜像仓库 |
+| 🤖 Skills | AI 开发技能包 | [madong-code/madong-admin-skills](https://github.com/madong-code/madong-admin-skills) | 可替换为自定义镜像仓库 |
+
+> 后台两套 UI 任选其一放入 `template/admin`；前台使用 `web-nuxt`，与多租户版共用。
+> 表格中的「默认仓库」即提交给安装 / 下载命令的 GitHub 路径。例如下载后台：
+> `php webman madong-download:frontend --admin` 会默认从上述 GitHub 仓库拉取；
+> 如需镜像，可配置 `dependencies.npm.registry` 等镜像源，或直接指定镜像仓库地址。
 
 ## 技术栈
 
-| 技术 | 版本        | 说明 |
-|------|-----------|------|
-| PHP | 8.2 ~ 8.4 | 核心开发语言 |
-| Webman | 2.2        | 高性能 PHP 框架 |
-| MySQL | 8.0+      | 数据库 |
-| Redis | 7.0+      | 缓存服务 |
-| Composer | 2.x       | 依赖管理工具 |
-| Nginx/Apache | -         | Web 服务器 |
+| 技术 | 说明 |
+|------|------|
+| PHP | 8.2 ~ 8.4，核心开发语言 |
+| Webman | 2.2，高性能 PHP 框架 |
+| MySQL | 8.0+，数据库 |
+| Redis | 7.0+，缓存服务 |
+| Composer | 2.x，依赖管理工具 |
+| Nginx / Apache | Web 服务器 |
 
 ## 项目结构
 
 ```
-madong/                          # 项目根目录
-├── backend/                     # 后端目录（当前目录）
-│   ├── app/                    # 应用目录（单体分层结构）
-│   │   ├── adminapi/           # 管理后台 API
-│   │   │   ├── config/         # 后台 API 配置
-│   │   │   ├── controller/     # 后台控制器（按业务域组织文件）
-│   │   │   ├── event/          # 后台事件
-│   │   │   ├── listener/       # 后台事件监听器
-│   │   │   ├── middleware/     # 后台中间件
-│   │   │   ├── schema/         # 后台数据结构定义
-│   │   │   ├── validate/       # 后台验证器
-│   │   │   └── CurrentUser.php # 当前用户上下文
-│   │   ├── api/                # 前台 API
-│   │   │   ├── config/         # 前台 API 配置
-│   │   │   ├── controller/     # 前台控制器（按站点组织文件）
-│   │   │   ├── event/          # 前台事件
-│   │   │   ├── listener/       # 前台事件监听器
-│   │   │   ├── middleware/     # 前台中间件
-│   │   │   ├── schema/         # 前台数据结构定义
-│   │   │   ├── validate/       # 前台验证器
-│   │   │   └── CurrentMember.php # 当前会员上下文
-│   │   ├── dao/                # 数据访问层（按业务域：content/member_sign/ops/site/sys_admin_type/system）
-│   │   ├── enum/               # 枚举类（content/system）
-│   │   ├── model/              # 模型（content/ops/system）
-│   │   ├── service/            # 业务服务层（admin/api/core）
-│   │   ├── schema/             # 数据结构定义（response/plugin）
-│   │   ├── command/            # 命令行工具（plugin 迁移）
-│   │   ├── event/              # 事件定义
-│   │   ├── listener/           # 事件监听器
-│   │   ├── bootstrap/          # 启动引导文件
-│   │   ├── middleware/          # 中间件
-│   │   ├── process/            # 自定义进程
-│   │   ├── queue/              # 队列任务
-│   │   ├── scope/              # 模型作用域
-│   │   ├── install/            # 安装脚本
-│   │   ├── exception/          # 异常处理
-│   │   └── functions.php       # 全局函数
-│   ├── config/                  # 配置文件
-│   │   ├── plugin/              # 插件配置（limiter/validation 等）
-│   │   ├── route/               # 路由配置
-│   │   └── *.php                # 各类配置文件
-│   ├── core/                    # 核心框架（领域分层架构）
-│   │   ├── business/           # 业务核心（多租户/审批等）
-│   │   ├── communication/      # 通信（sms/email/notify 消息通知）
-│   │   ├── foundation/         # 基础组件（cache/db/uuid/jwt/logger）
-│   │   ├── infrastructure/     # 基础设施（存储/队列等）
-│   │   ├── interface/          # 接口定义（契约/抽象）
-│   │   ├── io/                 # IO（upload 上传 / excel 导入导出）
-│   │   ├── security/           # 安全（captcha 验证码 / exception 异常）
-│   │   └── functions.php        # 核心函数
-│   ├── plugin/                   # 插件目录
-│   │   ├── codegen/              # 代码生成插件（后端）
-│   │   └── demo/                 # 演示插件（运行时 + 前端模板源）
-│   ├── public/                   # 静态资源
-│   ├── resource/                 # 资源文件（migrations 迁移 / seeds 种子 / menu 菜单 / translations 翻译）
-│   ├── runtime/                  # 运行时文件
-│   ├── support/                  # 第三方支持库
-│   ├── tests/                    # 单元测试
-│   ├── vendor/                   # Composer 依赖包
-│   ├── composer.json             # Composer 配置
-│   ├── composer.lock             # 依赖锁定文件
-│   ├── phpunit.xml               # 测试配置
-│   └── README.md                 # 项目说明文档
-│
-└── template/                     # 前端模板目录（需单独下载）
-    ├── admin/                    # 管理后台前端
-    ├── web/                      # 前台前端
-    └── install/                  # 安装器前端
+madong/
+├── backend/    # 后端（含 CLI 安装向导，一键安装自动配置）
+└── template/   # 前端模板（admin / web / install，见上方仓库表单独下载）
 ```
 
-> **注意**：前后端分离部署，前端目录需单独下载或创建。
+> 更多模块、目录与开发文档，请查看官方文档：[madong.tech](https://madong.tech)
 
 ## 核心功能
 
 - **用户认证**：基于 JWT 的身份验证机制
 - **权限管理**：细粒度的权限控制体系
-- **缓存服务**：集成 Redis 缓存，提升系统性能
-- **邮件服务**：支持邮件发送功能
+- **缓存服务**：集成 Redis 缓存
+- **通信基础设施**：邮件 / 短信 / 通知
 - **文件上传**：支持多种存储方式
 - **国际化**：支持多语言配置
 - **插件系统**：支持第三方扩展（codegen 代码生成、demo 演示等）
-- **命令行工具**：支持更多操作（插件迁移等）
-- **SSE 实时推送**：支持 Server-Sent Events 实时进度反馈
-- **服务层架构**：清晰的 DAO/Service 分层设计
+- **SSE 实时推送**：插件安装 / 卸载进度实时反馈
+- **服务层架构**：清晰的 DAO / Service 分层设计
 - **代码生成器**：自动化生成控制器、模型、服务层代码
-- **数据迁移**：支持数据库版本化管理
-- **单体架构**：标准版与多租户版统一架构，便于按需启用
+- **数据迁移**：数据库版本化管理
+- **双前端 UI**：后台两套可选 Admin UI，前台站点独立工程（与多租户版共用）
 
 ## 运行环境
 
 - PHP 8.2 ~ 8.4
 - MySQL 8.0+
 - Redis 7.0+
-- Nginx/Apache
+- Nginx / Apache
 - Composer 2.x+
+- Node.js（前端构建，含 pnpm）
 
 ## 安装部署
 
 ### 1. 环境准备
 
-确保安装了以下软件：
-- PHP 8.2 ~ 8.4
-- MySQL 8.0+
-- Redis 7.0+
-- Nginx/Apache
-- Composer 2.x+
-- Git（用于下载前端资源）
+确保安装：PHP 8.2 ~ 8.4、MySQL 8.0+、Redis 7.0+、Composer 2.x+、Node.js（含 pnpm）、Git。
 
-### 2. 项目安装
+### 2. 安装后端依赖
 
 ```bash
-# 进入后端目录
 cd backend
-
-# 安装后端依赖
 composer install
 ```
 
 ### 3. 下载前端资源
 
-**方式一：使用命令下载（推荐）**
+**方式一：命令下载（推荐）**——默认从上方表格的 GitHub 仓库拉取：
 
 ```bash
-# 进入后端目录
 cd backend
-
-# 下载所有前端代码（管理后台 + 前台）
-php webman madong-download:frontend
-
-# 仅下载管理后台
-php webman madong-download:frontend --admin
-
-# 仅下载前台
-php webman madong-download:frontend --web
-
-# 指定分支下载
-php webman madong-download:frontend -b develop
-
-# 强制覆盖更新
-php webman madong-download:frontend -f
+php webman madong-download:frontend                 # 下载 admin + web
+php webman madong-download:frontend --admin         # 仅后台
+php webman madong-download:frontend --web           # 仅前台
+php webman madong-download:frontend -b develop      # 指定分支
+php webman madong-download:frontend -f              # 强制覆盖
 ```
 
-**方式二：手动下载**
-
-如果没有安装 Git 或无法使用命令，可手动下载前端代码：
-
-1. 从 GitHub 仓库下载：
-   - 管理后台：https://github.com/madong-code/madong-admin（template/admin）
-   - 前台：https://github.com/madong-code/web-nuxt（template/web）
-
-2. 解压后将代码放置到项目根目录：
-   ```
-   madong/
-   ├── backend/          # 后端代码
-   └── template/         # 前端模板代码
-       ├── admin/        # 管理后台前端（来自 madong-single）
-       ├── web/          # 前台前端（来自 madong-web）
-       └── install/      # 安装器前端
-   ```
+**方式二：手动下载**——从「双前端 UI 与仓库」表格中的 GitHub 地址克隆，后台任选一套 UI 放入 `template/admin`，前台放入 `template/web`。
 
 ### 4. 启动安装向导
-
-完成以上步骤后，访问安装向导完成系统配置：
 
 ```
 http://127.0.0.1:8500/install
@@ -208,190 +123,69 @@ http://127.0.0.1:8500/install
 ### 5. 启动服务
 
 ```bash
-# 进入后端目录
 cd backend
-
-# 开发环境启动
-php start.php start
-
-# 生产环境启动
-php start.php start -d
+php start.php start        # 开发环境
+php start.php start -d     # 生产环境（守护）
 ```
 
-服务默认运行在 `http://127.0.0.1:8500`
+服务默认运行在 `http://127.0.0.1:8500`。
 
 ## 配置说明
 
-### 数据库配置
+数据库、Redis 等连接配置由一键安装向导在安装过程中自动写入，无需手动修改。
 
-修改 `config/database.php` 文件，配置数据库连接：
+> 更多配置项与高级用法，请查看官方文档：[madong.tech](https://madong.tech)
 
-```php
-return [
-    'default' => 'mysql',
-    'connections' => [
-        'mysql' => [
-            'driver' => 'mysql',
-            'host' => '127.0.0.1',
-            'port' => 3306,
-            'database' => 'madong',
-            'username' => 'root',
-            'password' => '123456',
-            'charset' => 'utf8mb4',
-            'collation' => 'utf8mb4_unicode_ci',
-            'prefix' => '',
-        ],
-    ],
-];
-```
+## 插件依赖管理
 
-### Redis 配置
+插件在 `config/info.php` 中声明 `require.composer`（后端）与 `npm_require.admin|web|common`（前端）依赖，由 `core/business/plugin` 依赖流水线统一处理：
 
-修改 `config/redis.php` 文件，配置 Redis 连接：
+- **声明合并**：安装时合并到 `composer.json` 与 `template/{admin,web}/package.json`，冲突按 `dependencies.conflict.strategy`（`skip`/`override`/`fail`，默认 `skip`）
+- **真实安装**：`dependencies.auto_install` 默认 `false`，仅合并声明并输出待执行命令；置 `true` 后自动执行 `composer update` 与 `pnpm install`
+- **网络容错**：`dependencies.network.retry` 控制重试，`dependencies.composer.mirror` / `dependencies.npm.registry` 配置镜像源
+- **引用计数**：多插件共用依赖时，仅最后一个使用者卸载才剥离
+- **状态持久化**：依赖状态写入插件 `config/installed.php`，不依赖数据库；失败默认不阻断安装
+- **事务回滚**：安装 / 卸载失败自动还原依赖声明与模板目录
 
-```php
-return [
-    'default' => [
-        'host' => '127.0.0.1',
-        'port' => 6379,
-        'auth' => '',
-        'db' => 0,
-    ],
-];
-```
-
-## API 文档
-
-启动服务后，可通过以下方式访问 API 文档：
-- 查看 `app/adminapi/controller` 与 `app/api/controller` 目录下的控制器文件
-- 参考项目文档
-
-## 开发指南
-
-### 代码规范
-
-- 遵循 PSR-4 自动加载规范
-- 遵循 PSR-12 代码风格规范
-- 使用 PHP 8.2+ 的特性
-
-### 模块开发
-
-1. 创建控制器：在 `app/adminapi/controller`（按业务域组织文件）或 `app/api/controller`（按站点组织文件）目录下创建控制器
-2. 创建服务层：在 `app/service` 对应业务域目录下创建业务逻辑
-3. 创建 DAO 层：在 `app/dao` 对应业务域目录下创建数据访问对象
-4. 创建模型：在 `app/model` 对应业务域目录下创建 Eloquent 模型
-5. 配置路由：在 `config/route.php` 或 `config/route/adminapi.php` / `config/route/api.php` 文件中添加路由
-6. 测试：使用 Postman 或其他工具测试 API
-
-### 插件依赖管理
-
-插件在 `config/info.php` 中声明 `require.composer`（后端）与 `npm_require.admin|web|common`（前端）依赖，安装/卸载由 `core/business/plugin` 的依赖流水线统一处理：
-
-- **声明合并**：安装时合并到 `composer.json` 与 `template/{admin,web}/package.json`，版本冲突按 `dependencies.conflict.strategy`（`skip`/`override`/`fail`，默认 `skip`）处理
-- **真实安装**：`dependencies.auto_install` 默认 `false`，只合并声明并输出待执行命令清单；置为 `true` 后安装时自动执行 `composer update` 与 `pnpm install`
-- **网络容错**：`dependencies.network.retry` 控制网络类错误重试次数，`dependencies.composer.mirror` / `dependencies.npm.registry` 可配置镜像源
-- **lock 同步**：`dependencies.lock.sync` 开启后同步 `composer.lock` 与前端 lock，避免 `content-hash` 不一致
-- **引用计数**：多插件共用同一依赖时，仅在最后一个使用者卸载时才剥离
-- **状态持久化**：依赖状态（`installed`/`pending`/`failed`）写入插件 `config/installed.php`，不依赖数据库；安装失败默认不阻断插件安装
-- **事务回滚**：安装/卸载失败自动还原依赖声明与模板目录
-
-安装时若网络不通（如无法访问 GitHub），可后续补装：
+安装时若网络不通，可后续补装：
 
 ```bash
-# 查看依赖状态
-php webman madong-plugin:install-deps 插件名 --status
-
-# 重新执行依赖安装命令
-php webman madong-plugin:install-deps 插件名
+php webman madong-plugin:install-deps 插件名 --status    # 查看状态
+php webman madong-plugin:install-deps 插件名              # 重新安装
 ```
 
-管理端「模块市场 → 详情」在依赖为待安装/失败时展示状态标记与「补装依赖」按钮，也可通过接口 `GET /adminapi/plugin/{key}/dependencies` 查询、`GET /adminapi/plugin/{key}/dependencies/install`（SSE）触发补装。
-
-
-## 系统演示
-
-管理后台： http://v5.madong.tech 
-账号：admin 
-密码：123456
-
-## 更新日志
-
-### v5.1.0（当前版本）
-
-- 后端重构为 **madong 单体后台架构**，统一支持标准版与多租户版
-- **框架核心分层**：`core` 重构为 business / communication / foundation / infrastructure / interface / io / security 分层，移除旧的扁平 core 模块
-- **应用业务层重组**：`app` 重组为 adminapi（controller/事件/监听/验证器按业务域组织）与 api（前台站点）双入口，dao / model / enum / service / schema 按业务域分层，补充 command 插件迁移、event/listener、bootstrap 模块
-- **插件清理**：移除 `plugin/example` 示例插件，精简 `plugin/demo` 前端模板源，新增 `plugin/codegen` 代码生成插件
-- **数据迁移**：迁移文件重命名（2026_04_01 → 2026_07_01），新增系统/会员/代码生成/站点/审核表迁移，大幅更新菜单与种子数据
-- **配置与安装**：新增 `limiter`、重命名 `rate-limiter`，新增 `validation` 插件配置，更新安装器资源与 `composer` 依赖
-- **测试**：新增 `phpunit.xml` 单元测试配置
-
-### 5.0 版本
-
-- 重构后端架构，基于 Webman 框架
-- 实现 JWT 认证机制
-- 集成 Redis 缓存服务
-- 优化数据库操作
-- 增强插件系统，支持第三方扩展
-- 完善配置系统，支持多环境配置
-- 新增国际化支持，支持多语言
-- 优化错误处理和日志系统
-- 新增文件上传功能，支持多种存储方式
-- 完善命令行工具，支持更多操作
-- 新增 SSE 实时推送，支持插件安装/卸载进度实时反馈
-- 新增服务层（Service）和数据访问层（DAO）分层架构
-- 新增代码生成器，提升开发效率
-- 优化插件安装/卸载流程，统一由插件 Install.php 管理生命周期
-- 新增枚举类规范，统一状态码和业务枚举定义
+管理端「模块市场 → 详情」在依赖待安装 / 失败时展示状态与「补装依赖」按钮，也可通过 `GET /adminapi/plugin/{key}/dependencies` 查询、`GET /adminapi/plugin/{key}/dependencies/install`（SSE）触发。
 
 ## AI 开发技能（Skills）
 
-madong 提供一套面向 AI 编码助手的 Skills 技能包，覆盖后端、前端与跨端场景，帮助自动化完成模块开发、代码生成、CRUD 脚手架等任务。
+面向 AI 编码助手的技能包，覆盖后端、前端与跨端场景：
 
-- **仓库地址**：https://github.com/madong-code/madong-admin-skills
-- **目录结构**：
-  - `backend/`：后端开发技能（控制器 / 服务 / DAO / 迁移等脚手架）
-  - `frontend/`：前端开发技能（页面 / 表单 / 列表脚手架）
-  - `cross/`：跨端通用技能（约定规范、提交信息、同步脚本等）
-- **使用方式**：将 skills 仓库克隆到本地，按需加载对应技能到 AI 编码助手，按其 SOP 描述执行任务。
+- **仓库**：[madong-code/madong-admin-skills](https://github.com/madong-code/madong-admin-skills)（见上方仓库表）
+- **结构**：`backend/`（后端脚手架）、`frontend/`（前端脚手架）、`cross/`（跨端通用）
+- **使用**：克隆到本地，按需加载技能到 AI 助手，按其 SOP 执行
 
 ## 官方论坛
 
-产品BUG、优化建议，欢迎社区反馈：http://www.madong.tech
+产品 BUG、优化建议，欢迎社区反馈：http://www.madong.tech
 
 ## 如何贡献
 
-非常欢迎你的加入！[提一个 Issue](https://github.com/madong-code/madong-admin/issues) 或者提交一个 Pull Request。
+非常欢迎你的加入！[提一个 Issue](https://github.com/madong-code/madong-admin/issues) 或提交 Pull Request。
 
-**Pull Request:**
+1. Fork 代码
+2. 创建分支：`git checkout -b feature/xxxx`
+3. 提交：`git commit -am 'feat(function): add xxxxx'`
+4. 推送：`git push origin feature/xxxx`
+5. 提交 Pull Request
 
-1. Fork 代码!
-2. 创建自己的分支: `git checkout -b feature/xxxx`
-3. 提交你的修改: `git commit -am 'feat(function): add xxxxx'`
-4. 推送您的分支: `git push origin feature/xxxx`
-5. 提交`pull request`
+## Git 提交规范
 
-## Git 贡献提交规范
-
-- 参考规范([Git](https://www.conventionalcommits.org/) [Vue](https://github.com/vuejs/vue/blob/dev/.github/COMMIT_CONVENTION.md) [Angular](https://github.com/conventional-changelog/conventional-changelog/tree/master/packages/conventional-changelog-angular))
-
-  - `feat` 增加新功能
-  - `fix` 修复问题/BUG
-  - `style` 代码风格相关无影响运行结果的
-  - `perf` 优化/性能提升
-  - `refactor` 重构
-  - `revert` 撤销修改
-  - `test` 测试相关
-  - `docs` 文档/注释
-  - `chore` 依赖更新/脚手架配置修改等
-  - `ci` 持续集成
-  - `types` 类型定义文件更改
-  - `wip` 开发中
+参考 [Conventional Commits](https://www.conventionalcommits.org/)：`feat` / `fix` / `style` / `perf` / `refactor` / `revert` / `test` / `docs` / `chore` / `ci` / `types` / `wip`。
 
 ## 社区支持
-- 官方文档：https://madong.tech
-- 讨论交流：[点击链接加入群聊：690671595](https://qm.qq.com/q/dEfMqYL42c)
 
+- 官方文档：https://madong.tech
+- 讨论交流：[QQ 群 690671595](https://qm.qq.com/q/dEfMqYL42c)
 
 ## 许可证
 
