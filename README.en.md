@@ -283,6 +283,30 @@ After starting the service, the API can be explored by:
 5. Add routes in `config/route.php`, `config/route/adminapi.php` or `config/route/api.php`
 6. Test the API with Postman or similar tools
 
+### Plugin Dependency Management
+
+Plugins declare dependencies in `config/info.php` via `require.composer` (backend) and `npm_require.admin|web|common` (frontend). Install/uninstall is handled by the dependency pipeline in `core/business/plugin`:
+
+- **Declaration merge**: merged into `composer.json` and `template/{admin,web}/package.json`; version conflicts follow `dependencies.conflict.strategy` (`skip`/`override`/`fail`, default `skip`)
+- **Real installation**: `dependencies.auto_install` defaults to `false` (merge declarations only and print the pending command list); set it to `true` to run `composer update` and `pnpm install` automatically
+- **Network resilience**: `dependencies.network.retry` controls retries for network errors; `dependencies.composer.mirror` / `dependencies.npm.registry` configure mirrors
+- **Lock sync**: with `dependencies.lock.sync` enabled, `composer.lock` and the frontend lockfile are synchronized to avoid `content-hash` mismatches
+- **Reference counting**: a shared dependency is only removed when the last plugin using it is uninstalled
+- **State persistence**: dependency state (`installed`/`pending`/`failed`) is stored in the plugin's `config/installed.php` (no database involved); a failed dependency install does not abort the plugin install by default
+- **Transaction rollback**: failed install/uninstall restores dependency declarations and template directories
+
+If the network is unavailable during install (e.g. GitHub unreachable), retry later:
+
+```bash
+# Show dependency status
+php webman madong-plugin:install-deps <plugin> --status
+
+# Re-run dependency installation
+php webman madong-plugin:install-deps <plugin>
+```
+
+In the admin panel (Module Market → Detail) a status badge and an "Install Dependencies" button appear when dependencies are pending/failed. The same data is available via `GET /adminapi/plugin/{key}/dependencies` and `GET /adminapi/plugin/{key}/dependencies/install` (SSE).
+
 ## Live Demo
 
 Admin panel: http://v5.madong.tech/admin

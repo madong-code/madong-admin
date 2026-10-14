@@ -283,6 +283,30 @@ return [
 5. 配置路由：在 `config/route.php` 或 `config/route/adminapi.php` / `config/route/api.php` 文件中添加路由
 6. 测试：使用 Postman 或其他工具测试 API
 
+### 插件依赖管理
+
+插件在 `config/info.php` 中声明 `require.composer`（后端）与 `npm_require.admin|web|common`（前端）依赖，安装/卸载由 `core/business/plugin` 的依赖流水线统一处理：
+
+- **声明合并**：安装时合并到 `composer.json` 与 `template/{admin,web}/package.json`，版本冲突按 `dependencies.conflict.strategy`（`skip`/`override`/`fail`，默认 `skip`）处理
+- **真实安装**：`dependencies.auto_install` 默认 `false`，只合并声明并输出待执行命令清单；置为 `true` 后安装时自动执行 `composer update` 与 `pnpm install`
+- **网络容错**：`dependencies.network.retry` 控制网络类错误重试次数，`dependencies.composer.mirror` / `dependencies.npm.registry` 可配置镜像源
+- **lock 同步**：`dependencies.lock.sync` 开启后同步 `composer.lock` 与前端 lock，避免 `content-hash` 不一致
+- **引用计数**：多插件共用同一依赖时，仅在最后一个使用者卸载时才剥离
+- **状态持久化**：依赖状态（`installed`/`pending`/`failed`）写入插件 `config/installed.php`，不依赖数据库；安装失败默认不阻断插件安装
+- **事务回滚**：安装/卸载失败自动还原依赖声明与模板目录
+
+安装时若网络不通（如无法访问 GitHub），可后续补装：
+
+```bash
+# 查看依赖状态
+php webman madong-plugin:install-deps 插件名 --status
+
+# 重新执行依赖安装命令
+php webman madong-plugin:install-deps 插件名
+```
+
+管理端「模块市场 → 详情」在依赖为待安装/失败时展示状态标记与「补装依赖」按钮，也可通过接口 `GET /adminapi/plugin/{key}/dependencies` 查询、`GET /adminapi/plugin/{key}/dependencies/install`（SSE）触发补装。
+
 
 ## 系统演示
 
