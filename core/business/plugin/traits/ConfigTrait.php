@@ -241,6 +241,62 @@ trait ConfigTrait
     }
 
     /**
+     * 保存插件依赖状态到 config/installed.php
+     *
+     * 依赖状态随插件走，完全不依赖数据库，便于运维在任意环境查看与补装。
+     *
+     * @param array $state ['status' => installed|pending|failed|none, 'dependencies' => [...]]
+     */
+    protected function saveDependencyState(array $state): void
+    {
+        $configFile = $this->getPluginConfigFile();
+        $configDir  = dirname($configFile);
+
+        if (!is_dir($configDir)) {
+            @mkdir($configDir, 0755, true);
+        }
+
+        $config = [];
+        if (file_exists($configFile)) {
+            $config = include $configFile;
+            $config = is_array($config) ? $config : [];
+        }
+
+        // 按类型合并，保留本次运行未涉及的类型（避免整体替换导致 admin/web 等被清空）
+        $existingDeps               = is_array($config['dependencies'] ?? null) ? $config['dependencies'] : [];
+        $config['dependencies']     = array_replace($existingDeps, $state['dependencies'] ?? []);
+        // 新增依赖同样按类型合并，供卸载时安全剥离（仅移除真正新增的，不动框架预置依赖）
+        $existingAdded                  = is_array($config['added_dependencies'] ?? null) ? $config['added_dependencies'] : [];
+        $config['added_dependencies']   = array_replace($existingAdded, $state['added_dependencies'] ?? []);
+        $config['dependency_status']     = $state['status'] ?? 'none';
+        $config['dependency_updated_at'] = date('Y-m-d H:i:s');
+
+        $content = "<?php\n\n/**\n * 插件安装状态配置\n * 此文件由系统自动生成，请勿手动修改\n */\n\nreturn " . var_export($config, true) . ";\n";
+
+        @file_put_contents($configFile, $content, LOCK_EX);
+    }
+
+    /**
+     * 获取插件依赖状态
+     *
+     * @return array{status: string, updated_at: string|null, dependencies: array}
+     */
+    public function getDependencyState(): array
+    {
+        $config = $this->getPluginConfig();
+
+        if ($config === null) {
+            return ['status' => 'none', 'updated_at' => null, 'dependencies' => []];
+        }
+
+        return [
+            'status'       => $config['dependency_status'] ?? 'none',
+            'updated_at'   => $config['dependency_updated_at'] ?? null,
+            'dependencies' => $config['dependencies'] ?? [],
+        ];
+    }
+
+    /**
      * 删除插件配置文件
      */
     protected function removePluginConfig(): void

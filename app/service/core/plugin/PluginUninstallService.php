@@ -141,7 +141,7 @@ class PluginUninstallService extends PluginBaseService
 
         } catch (\Throwable $e) {
             // 发送卸载失败事件
-            yield Sse::error('卸载失败：' . $e->getMessage(), [
+            yield Sse::error('卸载失败（已回滚依赖声明与模板改动）：' . $e->getMessage(), [
                 'exception' => get_class($e),
                 'message'   => $e->getMessage(),
                 'file'      => $e->getFile(),

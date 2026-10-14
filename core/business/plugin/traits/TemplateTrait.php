@@ -62,6 +62,11 @@ trait TemplateTrait
 
         $this->recurseCopy($sourceDir, $targetDir);
 
+        // 记录安装创建的模板目录，便于安装失败时回滚清理
+        if (method_exists($this, 'trackCreatedTemplate')) {
+            $this->trackCreatedTemplate($targetDir);
+        }
+
         $this->output("  ✅ {$endpoint}: Templates copied to {$targetDir}");
     }
 
@@ -117,6 +122,12 @@ trait TemplateTrait
 
         if (!is_dir($targetDir)) {
             $this->output("  ⚠️ {$endpoint}: Template directory not found");
+            return;
+        }
+
+        // 事务开启时改为移动到备份目录，卸载失败可原样移回
+        if (method_exists($this, 'backupTemplateDir') && $this->backupTemplateDir($endpoint, $targetDir)) {
+            $this->output("  ✅ {$endpoint}: Templates moved to backup (可回滚)");
             return;
         }
 

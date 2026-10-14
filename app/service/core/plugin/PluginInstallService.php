@@ -158,49 +158,78 @@ final class PluginInstallService extends PluginBaseService
                 throw new PluginException("插件 Install.php 的父类 {$parentName} 不存在，请检查 use 导入路径");
             }
 
-            // 实例化并执行插件 Install 类（传入进度回调以支持在线模式反馈）
-            $installInstance = new $className();
-
-            $installInstance->setContext('default');
-
-            // 创建进度记录临时文件
+            // 创建进度记录临时文件（父进程与子进程共享，实现实时进度推送）
             $outputFile = $this->createProgressFile('install', $sessionUuid);
-            $progressCallback = $this->createProgressCallback($outputFile);
 
-            // 设置进度回调和在线模式
-            $installInstance->setProgressCallback($progressCallback);
-            $installInstance->setOnlineMode(true);
+            // 子进程执行插件安装：真实依赖下载（composer/pnpm）可能超过 10 分钟，
+            // 同步执行会导致 SSE 长时间无输出（UI 假死），改为后台执行 + 轮询进度文件实时推送
+            $command = sprintf(
+                '%s %s madong-plugin:run %s install %s --progress %s',
+                escapeshellarg(PHP_BINARY),
+                escapeshellarg(base_path('webman')),
+                escapeshellarg($code),
+                escapeshellarg((string)$version),
+                escapeshellarg($outputFile)
+            );
 
-            // 开启输出缓冲，捕获 Install::install() 内部的 echo 输出
-            try {
-                $this->captureOutputWithProgress(function() use ($installInstance, $version) {
-                    $installInstance->install($version);
-                }, $outputFile);
-            } catch (\Throwable $e) {
+            $process = $this->spawnDetachedProcess($command, $outputFile);
+            if (!is_resource($process)) {
                 $this->cleanupProgressFile($outputFile);
-                yield Sse::error('插件安装执行失败: ' . $e->getMessage(), [
-                    'exception' => get_class($e),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                ], $sessionUuid);
+                yield Sse::error('插件安装进程启动失败', [], $sessionUuid);
                 return;
             }
 
-            // 读取文件内容并 yield 所有日志
-            yield from $this->yieldProgressLines($outputFile, 50, [], $sessionUuid);
+            // 轮询进度文件，实时推送安装日志
+            $offset   = 0;
+            $step     = 0;
+            $exitCode = -1;
+            try {
+                while (true) {
+                    [$lines, $offset] = $this->readNewProgressLines($outputFile, $offset);
+                    foreach ($lines as $line) {
+                        $step++;
+                        yield Sse::progress($line, min(84, 50 + intdiv($step, 10)), [], $sessionUuid);
+                    }
+
+                    $status = proc_get_status($process);
+                    if (!$status['running']) {
+                        $exitCode = (int)$status['exitcode'];
+                        break;
+                    }
+                    usleep(800000);
+                }
+            } finally {
+                proc_close($process);
+            }
+
+            // 收尾：读取子进程退出前后写入的剩余日志
+            [$lines] = $this->readNewProgressLines($outputFile, $offset, true);
+            foreach ($lines as $line) {
+                yield Sse::progress($line, 85, [], $sessionUuid);
+            }
 
             // 清理临时文件
             $this->cleanupProgressFile($outputFile);
 
+            if ($exitCode !== 0) {
+                yield Sse::error("插件安装执行失败（exit: {$exitCode}）", [], $sessionUuid);
+                return;
+            }
+
             yield Sse::progress('插件安装方法执行成功', 85, [], $sessionUuid);
 
-            // 8. 创建安装标记
+            // 8. 创建安装标记（合并写入，避免覆盖依赖状态等字段）
             yield Sse::progress('创建安装标记', 90, [], $sessionUuid);
             $installedConfig = [
                 'version' => $pluginConfig['version'] ?? '1.0.0',
                 'installed_at' => date('Y-m-d H:i:s'),
             ];
-            file_put_contents($installedConfigFile, '<?php return ' . var_export($installedConfig, true) . ';');
+            $existingConfig = [];
+            if (file_exists($installedConfigFile)) {
+                $existingConfig = include $installedConfigFile;
+                $existingConfig = is_array($existingConfig) ? $existingConfig : [];
+            }
+            file_put_contents($installedConfigFile, '<?php return ' . var_export(array_merge($existingConfig, $installedConfig), true) . ';');
             yield Sse::progress('安装标记创建成功', 95, [], $sessionUuid);
 
             // 9. 安装完成 - 派发安装后事件

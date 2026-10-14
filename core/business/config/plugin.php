@@ -105,6 +105,53 @@ return [
             'merge_require'     => true,
             'merge_require_dev' => true,
         ],
+
+        // 注意：插件「安装」流程固定只合并依赖声明（pending），不做真实下载，
+        // 以免阻塞 worker 导致 SSE 连接断开、后端失联。
+        // 真实下载仅由独立的「补装依赖」手动操作触发（force=true）。
+        'auto_install' => false,
+
+        // 真实安装失败时的处理策略：continue(插件安装成功，依赖标记待装) / abort(中止安装并回滚)
+        'on_failure' => 'continue',
+
+        // 版本冲突策略：skip(保留现有版本并提示) / override(覆盖为插件声明版本) / fail(中止安装)
+        'conflict' => [
+            'strategy' => 'skip',
+        ],
+
+        // lock 文件同步配置（避免 composer.json 与 composer.lock 的 content-hash 不一致）
+        'lock' => [
+            'sync'          => true,
+            // update-lock: composer update --lock（仅重算 hash，不改变已锁定版本）
+            'composer_mode' => 'update-lock',
+            // lockfile-only: pnpm install --lockfile-only（只更新 lock，不落地 node_modules）
+            'frontend_mode' => 'lockfile-only',
+        ],
+
+        // Composer 执行配置
+        'composer' => [
+            'bin'     => 'composer',
+            // 镜像源（留空则使用全局默认源），如 https://mirrors.tencent.com/composer/
+            'mirror'  => '',
+            // 大项目 composer update 可能超过 10 分钟
+            'timeout' => 900,
+        ],
+
+        // 前端包管理器执行配置
+        'npm' => [
+            // pnpm / npm / auto（按 packageManager 字段与 lock 文件自动探测）
+            'manager'  => 'auto',
+            // registry（留空则使用默认源），如 https://registry.npmmirror.com
+            'registry' => '',
+            // 大项目 pnpm install 普遍超过 10 分钟，默认 30 分钟
+            'timeout'  => 1800,
+        ],
+
+        // 网络失败重试配置（仅对网络类错误重试）
+        'network' => [
+            'retry'       => 2,
+            'retry_sleep' => 3,
+        ],
     ],
 
     /**

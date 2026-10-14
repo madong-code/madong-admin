@@ -100,6 +100,7 @@ return [
         // 模块市场 安装/卸载（GET SSE 流式接口，[^/]+ 兼容含连字符的插件标识）
         '/adminapi/plugin/[^/]+/install' => ['GET'],
         '/adminapi/plugin/[^/]+/uninstall' => ['GET'],
+        '/adminapi/plugin/[^/]+/dependencies/install' => ['GET'],
     ],
     'message' => '演示环境,不支持当前操作',
 ];

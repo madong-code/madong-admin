@@ -114,4 +114,86 @@ trait ProgressStreamTrait
             @unlink($outputFile);
         }
     }
+
+    /**
+     * 启动分离的后台进程（stdout/stderr 追加写入日志文件）
+     *
+     * @return resource|null 进程句柄
+     */
+    protected function spawnDetachedProcess(string $command, string $logFile)
+    {
+        if (!function_exists('proc_open')) {
+            return null;
+        }
+
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['file', $logFile, 'a'],
+            2 => ['file', $logFile, 'a'],
+        ];
+        $pipes = [];
+
+        $process = @proc_open($command, $descriptors, $pipes, base_path(), null, [
+            'bypass_shell' => true,
+        ]);
+
+        if (!is_resource($process)) {
+            return null;
+        }
+
+        fclose($pipes[0]);
+        return $process;
+    }
+
+    /**
+     * 增量读取进度日志中的完整行
+     *
+     * @param string $outputFile     日志文件
+     * @param int    $offset         当前读取偏移
+     * @param bool   $consumePartial 是否消费末尾未换行的半行（进程结束时收尾用）
+     *
+     * @return array{0: string[], 1: int} [完整行列表, 新读取偏移]
+     */
+    protected function readNewProgressLines(string $outputFile, int $offset, bool $consumePartial = false): array
+    {
+        if (!is_file($outputFile)) {
+            return [[], $offset];
+        }
+
+        clearstatcache(true, $outputFile);
+        $size = (int)filesize($outputFile);
+        if ($size <= $offset) {
+            return [[], $offset];
+        }
+
+        $handle = @fopen($outputFile, 'rb');
+        if ($handle === false) {
+            return [[], $offset];
+        }
+
+        fseek($handle, $offset);
+        $data = (string)fread($handle, $size - $offset);
+        fclose($handle);
+
+        if ($consumePartial) {
+            $newOffset = $size;
+        } else {
+            $lastNewline = strrpos($data, "\n");
+            if ($lastNewline === false) {
+                return [[], $offset]; // 等待完整行
+            }
+            $data      = substr($data, 0, $lastNewline + 1);
+            $newOffset = $offset + strlen($data);
+        }
+
+        $lines = [];
+        foreach (explode("\n", $data) as $line) {
+            $line = trim($line);
+            if ($line !== '') {
+                $lines[] = $line;
+            }
+        }
+
+        return [$lines, $newOffset];
+    }
 }

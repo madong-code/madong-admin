@@ -21,6 +21,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
@@ -45,7 +46,8 @@ class UninstallCommand extends BaseCommand
      */
     protected function configure(): void
     {
-        $this->addArgument('name', InputArgument::REQUIRED, 'Plugin name');
+        $this->addArgument('name', InputArgument::REQUIRED, 'Plugin name')
+            ->addOption('no-interaction', 'n', InputOption::VALUE_NONE, 'Non-interactive mode (skip confirmation)');
     }
 
     /**
@@ -61,8 +63,9 @@ class UninstallCommand extends BaseCommand
 
         $io->info("Uninstalling plugin: {$name}");
 
-        // 确认卸载
-        if (!$this->confirm($io, "Are you sure you want to uninstall plugin {$name}? This action cannot be undone.")) {
+        // 确认卸载（非交互模式 -n 时自动确认）
+        $noInteraction = (bool)$input->getOption('no-interaction');
+        if (!$this->confirm($io, "Are you sure you want to uninstall plugin {$name}? This action cannot be undone.", $noInteraction)) {
             $io->note("Uninstallation cancelled");
             return Command::SUCCESS;
         }

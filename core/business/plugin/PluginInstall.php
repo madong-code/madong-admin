@@ -39,6 +39,7 @@ use core\business\plugin\traits\SeedTrait;
 use core\business\plugin\traits\MenuTrait;
 use core\business\plugin\traits\TemplateTrait;
 use core\business\plugin\traits\DependencyTrait;
+use core\business\plugin\traits\DependencyTransactionTrait;
 class PluginInstall
 {
     use ConfigTrait;
@@ -47,6 +48,7 @@ class PluginInstall
     use MenuTrait;
     use TemplateTrait;
     use DependencyTrait;
+    use DependencyTransactionTrait;
 
     /** @var string 插件名称 */
     protected string $pluginName = '';
@@ -287,25 +289,39 @@ class PluginInstall
         $this->log("[START] Plugin Install: {$this->getPluginName()}", 0);
         $this->log("Version: {$version}");
 
-        $this->beforeInstall($version);
+        try {
+            // 开启事务：快照依赖声明文件，失败可回滚
+            $this->beginTransaction('install');
 
-        $this->installComposerDeps();
-        $this->installNpmDeps();
-        $this->copyTemplates();
-        $this->runInstallCommands();
+            $this->beforeInstall($version);
 
-        $this->runMigrations();
-        $this->runSeeds();
+            $this->installComposerDeps();
+            $this->installNpmDeps();
+            $this->outputDependencySummary();
 
-        // 统一导入消息数据（不依赖子类 afterInstall 是否调用 parent）
-        $this->importMessageData();
+            $this->copyTemplates();
+            $this->runInstallCommands();
 
-        $this->afterInstall($version);
+            $this->runMigrations();
+            $this->runSeeds();
 
-        $this->savePluginConfig($version);
+            // 统一导入消息数据（不依赖子类 afterInstall 是否调用 parent）
+            $this->importMessageData();
 
-        $this->log("[DONE] Install Completed", 100);
-        $this->finishExecutionLog('success');
+            $this->afterInstall($version);
+
+            $this->savePluginConfig($version);
+
+            $this->commitTransaction();
+
+            $this->log("[DONE] Install Completed", 100);
+            $this->finishExecutionLog('success');
+        } catch (\Throwable $e) {
+            // 回滚已合并的依赖声明与已复制的模板
+            $this->rollbackTransaction();
+            $this->finishExecutionLog('failed');
+            throw $e;
+        }
     }
 
     /**
@@ -355,44 +371,56 @@ class PluginInstall
 
         $this->log("[START] Plugin Uninstall: {$this->getPluginName()}", 0);
 
-        $this->beforeUninstall($version);
+        try {
+            // 开启事务：快照依赖声明与安装状态，模板删除改为备份式移动，失败可回滚
+            $this->beginTransaction('uninstall');
 
-        $pluginInfo      = $this->getPluginInfo();
-        $uninstallConfig = $pluginInfo['uninstall'] ?? [];
-        $dropTables      = $uninstallConfig['drop_tables'] ?? false;
+            $this->beforeUninstall($version);
 
-        $this->log("[RUN] Rollback migrations (drop_tables=" . ($dropTables ? 'true' : 'false') . ")");
-        $this->rollbackMigrations($dropTables);
-        $this->clearLogs();
+            $pluginInfo      = $this->getPluginInfo();
+            $uninstallConfig = $pluginInfo['uninstall'] ?? [];
+            $dropTables      = $uninstallConfig['drop_tables'] ?? false;
 
-        $this->afterUninstall($version);
+            $this->log("[RUN] Rollback migrations (drop_tables=" . ($dropTables ? 'true' : 'false') . ")");
+            $this->rollbackMigrations($dropTables);
+            $this->clearLogs();
 
-        // 清理插件来源的消息数据（表结构保留，不影响框架与其他插件数据）
-        $this->clearMessageData();
+            $this->afterUninstall($version);
 
-        $this->deleteTemplates();
+            // 清理插件来源的消息数据（表结构保留，不影响框架与其他插件数据）
+            $this->clearMessageData();
 
-        $globalUninstallConfig = $this->getConfig('uninstall', []);
-        $removeDependencies    = $uninstallConfig['remove_dependencies'] ?? $globalUninstallConfig['remove_dependencies'] ?? false;
+            $this->deleteTemplates();
 
-        if ($removeDependencies) {
-            $this->removeMergedDependencies();
-        } else {
-            $this->log("📦 Dependencies preserved in target projects. Remove manually if needed.");
+            $globalUninstallConfig = $this->getConfig('uninstall', []);
+            $removeDependencies    = $uninstallConfig['remove_dependencies'] ?? $globalUninstallConfig['remove_dependencies'] ?? false;
+
+            if ($removeDependencies) {
+                $this->removeMergedDependencies();
+            } else {
+                $this->log("📦 Dependencies preserved in target projects. Remove manually if needed.");
+            }
+
+            $this->removePluginConfig();
+
+            // 卸载时清理日志目录
+            $logDir = runtime_path('migrations/plugin/' . $this->pluginName);
+            if (is_dir($logDir)) {
+                $this->log("[RUN] Cleaning up logs directory");
+                $this->removeDirectory($logDir);
+                $this->log("[DONE] Logs directory removed");
+            }
+
+            $this->commitTransaction();
+
+            $this->log("[DONE] Uninstall Completed", 100);
+            $this->finishExecutionLog('success');
+        } catch (\Throwable $e) {
+            // 回滚：还原依赖声明与安装状态，移回模板目录
+            $this->rollbackTransaction();
+            $this->finishExecutionLog('failed');
+            throw $e;
         }
-
-        $this->removePluginConfig();
-
-        // 卸载时清理日志目录
-        $logDir = runtime_path('migrations/plugin/' . $this->pluginName);
-        if (is_dir($logDir)) {
-            $this->log("[RUN] Cleaning up logs directory");
-            $this->removeDirectory($logDir);
-            $this->log("[DONE] Logs directory removed");
-        }
-
-        $this->log("[DONE] Uninstall Completed", 100);
-        $this->finishExecutionLog('success');
     }
 
     /**

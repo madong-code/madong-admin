@@ -52,7 +52,8 @@ class RunCommand extends BaseCommand
             ->addArgument('version', InputArgument::OPTIONAL, 'Version (for update)')
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force run migrations (ignore previous records)')
             ->addOption('data', 'd', InputOption::VALUE_NONE, 'Export with data (for export action)')
-            ->addOption('output', 'o', InputOption::VALUE_OPTIONAL, 'Output file path (for export action)');
+            ->addOption('output', 'o', InputOption::VALUE_OPTIONAL, 'Output file path (for export action)')
+            ->addOption('progress', 'p', InputOption::VALUE_OPTIONAL, 'Progress log file (for online progress streaming)');
     }
 
     public function __invoke(InputInterface $input, OutputInterface $output): int
@@ -106,6 +107,18 @@ class RunCommand extends BaseCommand
             // 实例化并调用对应方法
             $instance = new $className();
             $io->info("Instance created: " . get_class($instance));
+
+            // 在线进度接线：将插件输出实时写入进度文件（供父进程/SSE 轮询推送）
+            $progressFile = (string)($input->getOption('progress') ?? '');
+            if ($progressFile !== '' && method_exists($instance, 'setOnlineMode')) {
+                $instance->setOnlineMode(true);
+                $instance->setProgressCallback(static function (string $message, ?int $progress = null) use ($progressFile): void {
+                    @file_put_contents($progressFile, $message . "\n", FILE_APPEND);
+                });
+            }
+            if (method_exists($instance, 'setContext')) {
+                $instance->setContext('default');
+            }
 
             switch ($action) {
                 case 'install':

@@ -23,6 +23,7 @@ use app\service\core\plugin\PluginDownloadService;
 use app\service\core\plugin\PluginInstallService;
 use app\service\core\plugin\PluginRemoteService;
 use app\service\core\plugin\PluginUninstallService;
+use app\service\core\plugin\PluginDependencyService;
 use app\service\core\plugin\PluginService;
 use core\business\plugin\traits\SseStreamTrait;
 use core\foundation\tool\Sse;
@@ -194,6 +195,62 @@ final class PluginController extends Base
             }
         } catch (\Throwable $e) {
             $connection->send(Sse::error('安装失败：' . $e->getMessage()));
+        }
+    }
+
+    #[OA\Get(
+        path: '/plugin/{key}/dependencies',
+        summary: '依赖状态',
+        tags: ['模块市场'],
+        parameters: [
+            new OA\Parameter(name: 'key', description: '插件标识', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ]
+    )]
+    #[Permission('plugin:market:detail')]
+    #[SimpleResponse(example: '{"code": 0,"msg": "ok","data": {"plugin": "demo","status": "pending","endpoints": {}}}')]
+    public function dependencies(Request $request): Response
+    {
+        try {
+            $key = $request->route->param('key');
+            /** @var PluginDependencyService $service */
+            $service = Container::make(PluginDependencyService::class);
+            return Json::success('ok', $service->status($key));
+        } catch (\Throwable $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    #[OA\Get(
+        path: '/plugin/{key}/dependencies/install',
+        summary: '补装依赖(SSE流式)',
+        tags: ['模块市场'],
+        parameters: [
+            new OA\Parameter(name: 'key', description: '插件标识', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ]
+    )]
+    #[Permission('plugin:market:install')]
+    public function installDependencies(Request $request): void
+    {
+        $key = $request->route->param('key');
+
+        $connection = $request->connection;
+
+        // 发送 SSE 响应头
+        $this->sendSseHeaders($connection);
+
+        try {
+            set_time_limit(0);
+
+            $connection->send(Sse::progress('开始补装插件「' . $key . '」依赖', 0));
+
+            /** @var PluginDependencyService $service */
+            $service   = Container::make(PluginDependencyService::class);
+            $generator = $service->install($key);
+            foreach ($generator as $chunk) {
+                $connection->send($chunk);
+            }
+        } catch (\Throwable $e) {
+            $connection->send(Sse::error('依赖补装失败：' . $e->getMessage()));
         }
     }
 
