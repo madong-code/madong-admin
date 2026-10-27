@@ -21,6 +21,7 @@ use app\service\api\member\MemberBindService;
 use app\service\api\member\MemberService;
 use core\foundation\exception\handler\UnauthorizedHttpException;
 use core\foundation\tool\Json;
+use core\infrastructure\logger\Logger;
 use madong\swagger\annotation\response\SimpleResponse;
 use madong\swagger\attribute\AllowAnonymous;
 use OpenApi\Attributes as OA;
@@ -83,8 +84,15 @@ final class MemberController extends Base
             }
 
             return Json::success('ok', $data);
-        } catch (\Throwable $e) {
+        } catch (UnauthorizedHttpException $e) {
+            // 凭证缺失/无效：明确的鉴权失败，保持 401 语义
             return Json::fail($e->getMessage(), null, 401);
+        } catch (\Throwable $e) {
+            // 非鉴权异常（DB/缓存/事件等）：记录日志便于排查，避免一切异常被静默吞成 401
+            Logger::error('member/user-info 失败: ' . $e->getMessage(), [
+                'file' => $e->getFile() . ':' . $e->getLine(),
+            ]);
+            return Json::fail('获取会员信息失败，请稍后重试', null, 500);
         }
     }
 
