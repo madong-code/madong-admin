@@ -207,7 +207,24 @@ trait DependencyTransactionTrait
         }
 
         if (!@rename($dir, $target)) {
-            return false;
+            // Windows 下 dev server（Vite/Nuxt watcher）持有目录句柄时 rename 会失败，
+            // 且回滚将无备份可用。先短暂重试等待句柄释放；仍失败则降级为
+            // 「复制到备份 + 保留原目录交由调用方删除」——复制只读文件，
+            // 不受目录句柄影响，保证各端（admin/web）备份语义一致、回滚始终可用
+            $moved = false;
+            for ($attempt = 0; $attempt < 3 && !$moved; $attempt++) {
+                if ($attempt > 0) {
+                    usleep(500000);
+                }
+                $moved = @rename($dir, $target);
+            }
+
+            if (!$moved) {
+                $copied = method_exists($this, 'recurseCopy') && $this->recurseCopy($dir, $target);
+                if (!$copied) {
+                    return false;
+                }
+            }
         }
 
         $this->backedUpTemplates[$target] = $dir;

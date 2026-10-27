@@ -80,6 +80,7 @@ final class PluginRemoteService extends PluginBaseService
                 'page'        => config('madong.page', 1),
                 'limit'       => config('madong.limit', 999),
                 'market_host' => config('madong.market_host', 'https://madong.tech'),
+                'framework'   => config('madong.framework', config('madong.downstream.default_framework', 'standard')),
             ];
             $args   = Dict::of($config);
             //优先使用传入的参数
@@ -97,6 +98,9 @@ final class PluginRemoteService extends PluginBaseService
             }
             if (!empty($params['market_host'])) {
                 $args->put('market_host', $params['market_host']);
+            }
+            if (!empty($params['framework'])) {
+                $args->put('framework', $params['framework']);
             }
 
             if (empty($args->get('auth_code')) || empty($args->get('auth_secret'))) {
@@ -133,6 +137,7 @@ final class PluginRemoteService extends PluginBaseService
                     'sign'        => $sign,
                     'page'        => 1,
                     'limit'       => 999,
+                    'framework'   => $args['framework'] ?? 'standard',
                 ],
             ]);
 

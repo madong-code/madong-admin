@@ -13,6 +13,8 @@ declare(strict_types=1);
  */
 namespace core\business\plugin\traits;
 
+use core\business\plugin\PhpArrayFormatter;
+
 /**
  * 配置管理 Trait
  * 实现配置的获取、合并和覆盖机制
@@ -194,13 +196,14 @@ trait ConfigTrait
         }
 
         $config = array_merge($existingConfig, [
-            'name'          => $this->getPluginName(),
-            'version'       => $version,
-            'installed_at'  => date('Y-m-d H:i:s'),
-            'status'        => 'installed',
+            'name'              => $this->getPluginName(),
+            'version'           => $version,
+            'installed_at'      => date('Y-m-d H:i:s'),
+            'status'            => 'installed',
+            'templates_pending' => method_exists($this, 'hasTemplateCopyFailures') && $this->hasTemplateCopyFailures(),
         ]);
 
-        $content = "<?php\n\n/**\n * 插件安装状态配置\n * 此文件由系统自动生成，请勿手动修改\n */\n\nreturn " . var_export($config, true) . ";\n";
+        $content = PhpArrayFormatter::export($config, "/**\n * 插件安装状态配置\n * 此文件由系统自动生成，请勿手动修改\n */");
 
         file_put_contents($configFile, $content);
 
@@ -271,7 +274,7 @@ trait ConfigTrait
         $config['dependency_status']     = $state['status'] ?? 'none';
         $config['dependency_updated_at'] = date('Y-m-d H:i:s');
 
-        $content = "<?php\n\n/**\n * 插件安装状态配置\n * 此文件由系统自动生成，请勿手动修改\n */\n\nreturn " . var_export($config, true) . ";\n";
+        $content = PhpArrayFormatter::export($config, "/**\n * 插件安装状态配置\n * 此文件由系统自动生成，请勿手动修改\n */");
 
         @file_put_contents($configFile, $content, LOCK_EX);
     }

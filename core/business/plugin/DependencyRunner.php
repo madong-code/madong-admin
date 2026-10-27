@@ -153,6 +153,33 @@ final class DependencyRunner
     }
 
     /**
+     * 解析可执行文件的真实 Windows 路径
+     *
+     * Windows 下 `where composer` 可能同时返回无扩展名的 unix 包装脚本与
+     * composer.bat；裸名经 proc_open 执行会命中错误包装器（典型报错
+     * "Could not open input file: composer.phar"），必须显式选择
+     * Windows 可执行扩展（.bat/.cmd/.exe）。
+     */
+    private function resolveBin(string $bin): string
+    {
+        if (PHP_OS_FAMILY !== 'Windows' || preg_match('/\.(bat|cmd|exe|phar)$/i', $bin) || str_contains($bin, '\\') || str_contains($bin, '/')) {
+            return $bin;
+        }
+
+        $result = @shell_exec('where ' . escapeshellarg($bin) . ' 2>nul');
+        if (is_string($result) && $result !== '') {
+            foreach (preg_split('/\r?\n/', trim($result)) ?: [] as $candidate) {
+                $candidate = trim($candidate);
+                if ($candidate !== '' && preg_match('/\.(bat|cmd|exe)$/i', $candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return $bin;
+    }
+
+    /**
      * 安装后端依赖（composer update 指定包）
      *
      * 前置条件：包声明已写入 composer.json
@@ -166,7 +193,7 @@ final class DependencyRunner
             return true;
         }
 
-        $bin      = $this->configValue('composer.bin', 'composer');
+        $bin      = $this->resolveBin((string)$this->configValue('composer.bin', 'composer'));
         $timeout  = (int)$this->configValue('composer.timeout', 600);
         $packages = array_keys($packages);
 
@@ -190,7 +217,7 @@ final class DependencyRunner
             return true;
         }
 
-        $bin     = $this->configValue('composer.bin', 'composer');
+        $bin     = $this->resolveBin((string)$this->configValue('composer.bin', 'composer'));
         $timeout = (int)$this->configValue('composer.timeout', 600);
 
         $command = escapeshellarg($bin) . ' remove --no-interaction --no-scripts ';
@@ -207,7 +234,7 @@ final class DependencyRunner
      */
     public function installFrontend(string $workDir, string $endpoint): bool
     {
-        $manager = $this->detectManager($workDir);
+        $manager = $this->resolveBin($this->detectManager($workDir));
         $timeout = (int)$this->configValue('npm.timeout', 600);
 
         $command = escapeshellarg($manager) . ' install' . $this->registryFlag();
@@ -224,9 +251,9 @@ final class DependencyRunner
             return true;
         }
 
-        $manager = $this->detectManager($workDir);
+        $manager = $this->resolveBin($this->detectManager($workDir));
         $timeout = (int)$this->configValue('npm.timeout', 600);
-        $remover = $manager === 'pnpm' ? 'remove' : 'uninstall';
+        $remover = str_contains($manager, 'pnpm') ? 'remove' : 'uninstall';
 
         $command = escapeshellarg($manager) . ' ' . $remover . ' ';
         foreach (array_keys($packages) as $package) {
@@ -248,7 +275,7 @@ final class DependencyRunner
             return true;
         }
 
-        $bin     = $this->configValue('composer.bin', 'composer');
+        $bin     = $this->resolveBin((string)$this->configValue('composer.bin', 'composer'));
         $timeout = (int)$this->configValue('composer.timeout', 600);
 
         $command = escapeshellarg($bin) . ' update --lock --no-interaction --no-scripts';
@@ -261,10 +288,10 @@ final class DependencyRunner
      */
     public function syncFrontendLock(string $workDir, string $endpoint): bool
     {
-        $manager = $this->detectManager($workDir);
+        $manager = $this->resolveBin($this->detectManager($workDir));
         $timeout = (int)$this->configValue('npm.timeout', 600);
 
-        $command = $manager === 'pnpm'
+        $command = str_contains($manager, 'pnpm')
             ? escapeshellarg($manager) . ' install --lockfile-only'
             : escapeshellarg($manager) . ' install --package-lock-only --ignore-scripts';
 
@@ -364,76 +391,73 @@ final class DependencyRunner
     /**
      * 执行单条命令并捕获输出（不重试）
      *
+     * stdout/stderr 重定向到临时文件而非管道：
+     * Windows 下 stream_set_blocking 对 proc_open 管道不可靠，顺序 fread 会
+     * 阻塞在无数据的管道上（典型：composer update --lock 输出走 stderr、
+     * stdout 全程无数据），导致轮询死锁、超时永不触发；文件重定向彻底规避。
+     *
      * @return array{0: int, 1: string, 2: string} [exitCode, stdout, stderr]
      */
     private function execWithTimeout(string $command, ?string $workDir, int $timeout): array
     {
+        $outFile = (string)tempnam(sys_get_temp_dir(), 'madong_dep_out_');
+        $errFile = (string)tempnam(sys_get_temp_dir(), 'madong_dep_err_');
+
         $descriptors = [
             0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
+            1 => ['file', $outFile, 'w'],
+            2 => ['file', $errFile, 'w'],
         ];
 
         $process = @proc_open($command, $descriptors, $pipes, $workDir);
         if (!is_resource($process)) {
+            @unlink($outFile);
+            @unlink($errFile);
             return [1, '', 'proc_open 调用失败'];
         }
 
-        stream_set_blocking($pipes[1], false);
-        stream_set_blocking($pipes[2], false);
+        // 立即关闭 stdin：命令均为非交互式，保持打开会让部分子进程等待 EOF
+        fclose($pipes[0]);
 
         $stdout   = '';
         $stderr   = '';
         $outBuf   = ''; // stdout 行缓冲（用于实时转发完整行）
         $errBuf   = ''; // stderr 行缓冲
+        $outPos   = 0;
+        $errPos   = 0;
         $deadline = time() + max(1, $timeout);
         $killed   = false;
 
         while (true) {
             $status = proc_get_status($process);
 
-            $chunk = fread($pipes[1], 8192);
-            if ($chunk !== false && $chunk !== '') {
-                $stdout .= $chunk;
-                $this->emitStreamLines($chunk, $outBuf);
-            }
-            $chunk = fread($pipes[2], 8192);
-            if ($chunk !== false && $chunk !== '') {
-                $stderr .= $chunk;
-                $this->emitStreamLines($chunk, $errBuf);
-            }
+            $outPos += $this->drainNewBytes($outFile, $outPos, $stdout, $outBuf);
+            $errPos += $this->drainNewBytes($errFile, $errPos, $stderr, $errBuf);
 
             if (!$status['running']) {
+                // 进程退出后最后冲刷一次，确保读到全部尾部输出
+                $this->drainNewBytes($outFile, $outPos, $stdout, $outBuf);
+                $this->drainNewBytes($errFile, $errPos, $stderr, $errBuf);
                 break;
             }
 
             if (time() > $deadline) {
                 $killed = true;
-                @proc_terminate($process, 9);
+                $this->killProcessTree($process);
                 break;
             }
 
             usleep(200000);
         }
 
-        // 收尾读取剩余输出
-        $rest = stream_get_contents($pipes[1]);
-        if ($rest !== false && $rest !== '') {
-            $stdout .= $rest;
-        }
         // 冲刷行缓冲中残留的最后一行
         $this->emitStreamLines("\n", $outBuf);
-        $rest = stream_get_contents($pipes[2]);
-        if ($rest !== false && $rest !== '') {
-            $stderr .= $rest;
-        }
         $this->emitStreamLines("\n", $errBuf);
 
-        fclose($pipes[0]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-
         $exitCode = proc_close($process);
+
+        @unlink($outFile);
+        @unlink($errFile);
 
         if ($killed) {
             $stderr .= "\n执行超时（超过 {$timeout}s），已终止进程";
@@ -441,6 +465,62 @@ final class DependencyRunner
         }
 
         return [$exitCode, $stdout, $stderr];
+    }
+
+    /**
+     * 读取临时文件自 $pos 起的新增字节：追加到 $sink 并按完整行转发
+     *
+     * @return int 本次读取的字节数
+     */
+    private function drainNewBytes(string $file, int $pos, string &$sink, string &$lineBuf): int
+    {
+        clearstatcache(true, $file);
+        $size = @filesize($file);
+        if ($size === false || $size <= $pos) {
+            return 0;
+        }
+
+        $fp = @fopen($file, 'rb');
+        if ($fp === false) {
+            return 0;
+        }
+        fseek($fp, $pos);
+
+        $chunk = '';
+        while (!feof($fp)) {
+            $part = fread($fp, 65536);
+            if ($part === false || $part === '') {
+                break;
+            }
+            $chunk .= $part;
+        }
+        fclose($fp);
+
+        if ($chunk === '') {
+            return 0;
+        }
+
+        $sink .= $chunk;
+        $this->emitStreamLines($chunk, $lineBuf);
+
+        return strlen($chunk);
+    }
+
+    /**
+     * 强杀进程树（含子孙进程）
+     */
+    private function killProcessTree($process): void
+    {
+        $status = proc_get_status($process);
+        $pid    = (int)($status['pid'] ?? 0);
+
+        if (PHP_OS_FAMILY === 'Windows' && $pid > 0) {
+            // proc_terminate 只能杀死直接进程（cmd.exe 包装器），孙进程
+            // （php.exe/composer.phar）会残留，必须整树强杀
+            @shell_exec('taskkill /F /T /PID ' . $pid);
+        }
+
+        @proc_terminate($process, 9);
     }
 
     /**
@@ -499,7 +579,7 @@ final class DependencyRunner
             return;
         }
 
-        $bin     = $this->configValue('composer.bin', 'composer');
+        $bin     = $this->resolveBin((string)$this->configValue('composer.bin', 'composer'));
         $command = escapeshellarg($bin) . ' config -g repositories.packagist composer ' . escapeshellarg($mirror);
 
         $this->run($command, $workDir, 'Composer 镜像源配置', 120);

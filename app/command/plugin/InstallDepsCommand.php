@@ -50,8 +50,9 @@ class InstallDepsCommand extends BaseCommand
      */
     protected function configure(): void
     {
-        $this->addArgument('name', InputArgument::REQUIRED, 'Plugin name');
-        $this->addOption('status', null, InputOption::VALUE_NONE, 'Only show dependency status');
+        $this->addArgument('name', InputArgument::REQUIRED, 'Plugin name')
+            ->addOption('status', null, InputOption::VALUE_NONE, 'Only show dependency status')
+            ->addOption('progress', null, InputOption::VALUE_OPTIONAL, 'Progress log file, for online SSE progress streaming');
     }
 
     /**
@@ -62,11 +63,25 @@ class InstallDepsCommand extends BaseCommand
         $io   = new SymfonyStyle($input, $output);
         $name = $input->getArgument('name');
 
-        $io->title('Plugin Dependency Installer');
-
         try {
             /** @var PluginDependencyService $service */
             $service = Container::get(PluginDependencyService::class);
+
+            $progressFile = (string)($input->getOption('progress') ?? '');
+
+            // 在线模式：真实安装过程逐行写入进度文件，由父进程轮询推送 SSE
+            if ($progressFile !== '') {
+                try {
+                    $service->runDependencyInstall($name, $progressFile);
+                } catch (\Throwable $e) {
+                    @file_put_contents($progressFile, '依赖补装失败：' . $e->getMessage() . "\n", FILE_APPEND);
+                    return Command::FAILURE;
+                }
+
+                return Command::SUCCESS;
+            }
+
+            $io->title('Plugin Dependency Installer');
 
             if ($input->getOption('status')) {
                 $status = $service->status($name);

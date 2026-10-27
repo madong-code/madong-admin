@@ -952,8 +952,8 @@ class PluginDevelopService extends PluginBaseService
                 continue;
             }
 
-            // 计算 ZIP 中的相对路径
-            $relativePath = substr($filePath, strlen($sourcePath) + 1);
+            // 计算 ZIP 中的相对路径（统一使用正斜杠，避免 Windows 打包后在 Linux 解压目录树异常）
+            $relativePath = str_replace('\\', '/', substr($filePath, strlen($sourcePath) + 1));
 
             // 添加文件到 ZIP
             if (!$zip->addFile($filePath, $relativePath)) {

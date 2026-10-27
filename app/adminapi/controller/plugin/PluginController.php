@@ -245,7 +245,9 @@ final class PluginController extends Base
 
             /** @var PluginDependencyService $service */
             $service   = Container::make(PluginDependencyService::class);
-            $generator = $service->install($key);
+            // 在线补装依赖改为后台子进程执行：真实 composer/pnpm 耗时较长，
+            // 同步执行会阻塞 worker 并导致 SSE 失去通信
+            $generator = $service->installOnline($key);
             foreach ($generator as $chunk) {
                 $connection->send($chunk);
             }

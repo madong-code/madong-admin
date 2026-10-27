@@ -17,6 +17,7 @@ use app\enum\common\PluginInstallEvent;
 use app\event\plugin\PluginInstalled;
 use app\event\plugin\PluginInstalling;
 use app\process\Monitor;
+use core\business\plugin\PhpArrayFormatter;
 use core\business\plugin\traits\ProgressStreamTrait;
 use core\foundation\exception\handler\PluginException;
 use core\foundation\tool\Sse;
@@ -59,8 +60,16 @@ final class PluginInstallService extends PluginBaseService
         $installedConfigFile = $pluginDir . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'installed.php';
 
         if (is_file($installedConfigFile)) {
-            yield Sse::warning('插件已安装，跳过安装', ['plugin' => $code], $sessionUuid);
-            return;
+            $existingInstalled = include $installedConfigFile;
+            $templatesPending  = is_array($existingInstalled) && !empty($existingInstalled['templates_pending']);
+
+            // 已安装；但模板未落盘时放行重装，用于自愈补齐模板
+            if (!$templatesPending) {
+                yield Sse::warning('插件已安装，跳过安装', ['plugin' => $code], $sessionUuid);
+                return;
+            }
+
+            yield Sse::progress('检测到上次安装模板未完全落盘，重新部署模板', 0, ['plugin' => $code], $sessionUuid);
         }
 
         try {
@@ -179,16 +188,23 @@ final class PluginInstallService extends PluginBaseService
                 return;
             }
 
-            // 轮询进度文件，实时推送安装日志
-            $offset   = 0;
-            $step     = 0;
-            $exitCode = -1;
+            // 轮询进度文件，实时推送安装日志（静默期发心跳，防止中间层断开 SSE）
+            $offset       = 0;
+            $step         = 0;
+            $exitCode     = -1;
+            $lastOutputAt = microtime(true);
             try {
                 while (true) {
                     [$lines, $offset] = $this->readNewProgressLines($outputFile, $offset);
-                    foreach ($lines as $line) {
-                        $step++;
-                        yield Sse::progress($line, min(84, 50 + intdiv($step, 10)), [], $sessionUuid);
+                    if ($lines !== []) {
+                        foreach ($lines as $line) {
+                            $step++;
+                            yield Sse::progress($line, min(84, 50 + intdiv($step, 10)), [], $sessionUuid);
+                        }
+                        $lastOutputAt = microtime(true);
+                    } elseif (microtime(true) - $lastOutputAt >= 3) {
+                        yield Sse::heartbeat(null);
+                        $lastOutputAt = microtime(true);
                     }
 
                     $status = proc_get_status($process);
@@ -218,22 +234,28 @@ final class PluginInstallService extends PluginBaseService
 
             yield Sse::progress('插件安装方法执行成功', 85, [], $sessionUuid);
 
-            // 8. 创建安装标记（合并写入，避免覆盖依赖状态等字段）
+            // 8. 创建安装标记（合并写入，避免覆盖依赖状态等字段；templates_pending 以子进程写入的真实状态为准）
             yield Sse::progress('创建安装标记', 90, [], $sessionUuid);
-            $installedConfig = [
-                'version' => $pluginConfig['version'] ?? '1.0.0',
-                'installed_at' => date('Y-m-d H:i:s'),
-            ];
-            $existingConfig = [];
+            $childConfig = [];
             if (file_exists($installedConfigFile)) {
-                $existingConfig = include $installedConfigFile;
-                $existingConfig = is_array($existingConfig) ? $existingConfig : [];
+                $childConfig = include $installedConfigFile;
+                $childConfig = is_array($childConfig) ? $childConfig : [];
             }
-            file_put_contents($installedConfigFile, '<?php return ' . var_export(array_merge($existingConfig, $installedConfig), true) . ';');
+            $installedConfig = array_merge($childConfig, [
+                'version'      => $pluginConfig['version'] ?? '1.0.0',
+                'installed_at' => date('Y-m-d H:i:s'),
+            ]);
+            file_put_contents($installedConfigFile, PhpArrayFormatter::export($installedConfig, "/**\n * 插件安装状态配置\n * 此文件由系统自动生成，请勿手动修改\n */"));
             yield Sse::progress('安装标记创建成功', 95, [], $sessionUuid);
 
             // 9. 安装完成 - 派发安装后事件
             (new PluginInstalled($code, $version))->dispatch();
+
+            // 模板仍未落盘时明确提示自愈路径，避免"假成功"
+            if (!empty($installedConfig['templates_pending'])) {
+                yield Sse::warning('模板未完全落盘（目标目录被占用）。请关闭占用 template 目录的程序后，在插件管理页再次点击「安装」即可自动补齐模板', ['plugin' => $code], $sessionUuid);
+            }
+
             yield Sse::completed(PluginInstallEvent::INSTALL_COMPLETED->label(), ['plugin' => $code], $sessionUuid);
             Monitor::pause();
 
