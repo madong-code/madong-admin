@@ -4,6 +4,7 @@
     <testsuite name="SaaS Test Suite">
       <directory suffix=".php">tests/saas</directory>
       <directory suffix=".php">tests/integration</directory>
+      <directory suffix=".php">tests/portal</directory>
     </testsuite>
   </testsuites>
   <coverage/>

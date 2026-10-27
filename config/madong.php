@@ -6,6 +6,17 @@ return [
     'auth_secret'   => env('madong.secret', '8439b36501df4f6185f521781d6b732'),//授权秘钥
     'response_type' => 'array',
 
+    // 下游业务系统接口（/api/madong/*）配置
+    'downstream' => [
+        'sign_ttl'          => (int) env('MADONG_DOWNSTREAM_SIGN_TTL', 300),
+        'default_limit'     => (int) env('MADONG_DOWNSTREAM_DEFAULT_LIMIT', 20),
+        'max_limit'         => (int) env('MADONG_DOWNSTREAM_MAX_LIMIT', 1000),
+        'max_update_logs'   => (int) env('MADONG_DOWNSTREAM_MAX_UPDATE_LOGS', 200),
+        'default_framework' => env('MADONG_FRAMEWORK', 'standard'),
+        'timeout'           => (int) env('MADONG_DOWNSTREAM_TIMEOUT', 30),
+        'hot_downloads'     => (int) env('MADONG_DOWNSTREAM_HOT_DOWNLOADS', 100),
+    ],
+
     // 上传资源 CDN（供 full_url() 读取 config('madong.upload.app.cdn_url') 使用）
     'upload' => [
         'app' => [

@@ -41,7 +41,7 @@ Route::get('/install', function () {
 
 // 站点首页
 Route::get('/', function () {
-    return redirect('/web');
+    return redirect('/admin');
 })->middleware(CheckInstallMiddleware::class);
 
 // 后台管理

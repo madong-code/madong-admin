@@ -20,8 +20,8 @@ global $argv;
 return [
     'webman'            => [
         'handler'     => Http::class,
-        'listen'      => 'http://0.0.0.0:8500',
-        'count'       => cpu_count() * 4,
+        'listen'      => 'http://0.0.0.0:8501',
+        'count'       => 2,
         'user'        => '',
         'group'       => '',
         'reusePort'   => false,

@@ -17,17 +17,15 @@ public/*
 !public/logo.png
 !public/upload/logo.png
 
-# 忽略 plugin目录下除了example除外（demo 等插件改为用户按需安装，不随主仓库分发）
-plugin/*
-
-
-# 本地临时与证书文件
-/.tmp/
-/tmp-certs/
-/runtimecerts*.pem
+# macOS 目录元数据
+.DS_Store
 
 # 本地包目录（引擎已改 composer VCS 安装，不随主仓库管理）
 /packages/
+
+# 插件包由插件包分发（安装/卸载由插件管理器负责），不随主仓库管理
+/plugin/
+plugin/*/config/installed.php
 
 # 临时诊断脚本
 .dbg/
