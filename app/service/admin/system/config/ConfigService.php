@@ -55,8 +55,8 @@ class ConfigService extends BaseService
             $map['group_code'] = $options['group_code'];
         }
 
-        // 查询配置（移除数据权限 Scope）
-        $configModel = $this->dao->get($map, ['*'], [], '', self::WITHOUT_SCOPES);
+        // 查询配置（移除数据权限 Scope；id asc 确定性排序，防重复行随机覆盖）
+        $configModel = $this->dao->get($map, ['*'], [], 'id asc', self::WITHOUT_SCOPES);
 
         // 没有配置直接返回默认值
         if (!$configModel) {
@@ -479,8 +479,10 @@ class ConfigService extends BaseService
             }
 
             $map         = ['code' => $code];
-            // 移除数据权限 Scope，否则查不到已存在记录会误建重复配置
-            $configModel = $this->dao->get($map, ['*'], [], '', self::WITHOUT_SCOPES);
+            // 移除数据权限 Scope，否则查不到已存在记录会误建重复配置；
+            // id asc 确定性排序 + 命中 group_code 过滤，防重复行时改错目标
+            $getMap      = isset($options['group_code']) ? ['code' => $code, 'group_code' => $options['group_code']] : $map;
+            $configModel = $this->dao->get($getMap, ['*'], [], 'id asc', self::WITHOUT_SCOPES);
 
             if (!empty($configModel)) {
                 // 更新内容

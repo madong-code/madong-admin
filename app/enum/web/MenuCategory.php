@@ -23,6 +23,7 @@ enum MenuCategory: int implements IEnum
     case NAV = 1;    // 导航菜单
     case MEMBER = 2; // 会员菜单
     case HEADER = 3; // 头部动作菜单
+    case FOOTER = 4; // 底部插座菜单（页脚链接列，web 插件统一绑定）
 
     /**
      * 获取文本
@@ -33,6 +34,7 @@ enum MenuCategory: int implements IEnum
             self::NAV => '导航菜单',
             self::MEMBER => '会员菜单',
             self::HEADER => '头部动作菜单',
+            self::FOOTER => '底部菜单',
         };
     }
 
@@ -53,6 +55,7 @@ enum MenuCategory: int implements IEnum
             self::NAV => '#409EFF',
             self::MEMBER => '#67C23A',
             self::HEADER => '#E6A23C',
+            self::FOOTER => '#909399',
         };
     }
 }
