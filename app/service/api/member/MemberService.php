@@ -41,6 +41,11 @@ class MemberService extends BaseService
     /**
      * 更新会员信息
      *
+     * 注意：
+     * 1. user-info 走 CurrentMember 缓存（member_user_{id}），保存成功必须清缓存，
+     *    否则回显读到旧数据（提示成功但页面不更新）
+     * 2. 重复提交相同数据视为幂等成功（返回时不抛错），避免"数据没有变化"被当成保存失败
+     *
      * @throws \Exception
      * @throws \Throwable
      */
@@ -58,10 +63,11 @@ class MemberService extends BaseService
             throw new \Exception('用户不存在', 401);
         }
 
-        $allowedFields = ['nickname', 'avatar', 'gender', 'birthday','bio'];
+        $allowedFields = ['nickname', 'avatar', 'gender', 'birthday', 'bio'];
         $updateData    = [];
         foreach ($allowedFields as $field) {
-            if (isset($data[$field])) {
+            // 用 array_key_exists：允许显式传 null（如清空生日），isset 会漏掉 null 字段
+            if (array_key_exists($field, $data)) {
                 $updateData[$field] = $data[$field];
             }
         }
@@ -71,12 +77,14 @@ class MemberService extends BaseService
         }
 
         $model->fill($updateData);
-        
-        if (!$model->isDirty()) {
-            throw new \Exception('数据没有变化', 400);
+
+        // 无实际变化（重复保存相同内容）按幂等成功处理，不视为错误
+        if ($model->isDirty()) {
+            $model->save();
         }
-        
-        $model->save();
+
+        // 无论本次是否有变化都清缓存：清掉可能残留的旧数据，保证回显与数据库一致
+        $currentMember->clearCache($id);
     }
 
     /**
