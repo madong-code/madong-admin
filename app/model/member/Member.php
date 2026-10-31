@@ -189,10 +189,26 @@ class Member extends BaseModel
 
     /**
      * 设置密码
+     *
+     * 后台通用 CRUD（Crud::insertInput）与后台重置密码会先对密码做哈希再写库，
+     * 此处若再次哈希会导致「哈希的哈希」，password_verify 永远失败，
+     * 因此已哈希的值原样保存，仅对明文密码执行哈希（前台注册、找回密码等场景）。
      */
     public function setPasswordAttribute($value): void
     {
-        $this->attributes['password'] = password_hash($value, PASSWORD_DEFAULT);
+        // 空值不写库，避免编辑会员时把已有密码覆盖为空字符串的哈希
+        if ($value === null || $value === '') {
+            return;
+        }
+
+        // password_get_info 对任意算法（bcrypt/argon2 等）的哈希都能识别，比正则判断更通用
+        $info = password_get_info((string)$value);
+        if (!empty($info['algo'])) {
+            $this->attributes['password'] = $value;
+            return;
+        }
+
+        $this->attributes['password'] = password_hash((string)$value, PASSWORD_DEFAULT);
     }
 
     /**
