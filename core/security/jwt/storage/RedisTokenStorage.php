@@ -45,7 +45,8 @@ class RedisTokenStorage implements TokenStorageInterface
                 'created_at'  => $data['created_at'] ?? time(),
                 'refresh_jti' => $data['refresh_jti'] ?? '',
             ]));
-            Redis::expire($userKey, $this->config['ttl']['refresh'] ?? 604800);
+            // .env 注入的 ttl 为字符串，此处显式转为 int 兜底
+            Redis::expire($userKey, (int)($this->config['ttl']['refresh'] ?? 604800));
         }
 
         return true;

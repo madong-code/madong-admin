@@ -84,6 +84,18 @@ class JwtToken
             $this->secret = 'default-secret-key-for-development';
         }
 
+        // 归一化数值型配置：.env 经 env() 读取恒为字符串，若直接传入 int 形参（save/add 等）会抛 TypeError
+        if (!is_array($this->config['ttl'] ?? null)) {
+            $this->config['ttl'] = [];
+        }
+        $this->config['ttl']['access']  = $this->normalizeTtl($this->config['ttl']['access'] ?? null, 7200);
+        $this->config['ttl']['refresh'] = $this->normalizeTtl($this->config['ttl']['refresh'] ?? null, 604800);
+
+        if (!is_array($this->config['security'] ?? null)) {
+            $this->config['security'] = [];
+        }
+        $this->config['security']['max_devices'] = max(0, (int)($this->config['security']['max_devices'] ?? 0));
+
         $this->tokenStorage     = $tokenStorage ?? new RedisTokenStorage($this->config);
         $this->blacklistStorage = $blacklistStorage ?? new RedisBlacklistStorage($this->config);
     }
@@ -714,6 +726,23 @@ class JwtToken
     }
 
     // ==================== 私有方法 ====================
+
+    /**
+     * 归一化 TTL 配置
+     *
+     * .env 中的值经 env() 读取后为字符串，需转为 int；
+     * 非法值（非数字、0、负数）回退到默认值，避免 Redis setex 立即过期
+     *
+     * @param mixed $value    原始配置值
+     * @param int   $fallback 回退值（秒）
+     *
+     * @return int
+     */
+    protected function normalizeTtl(mixed $value, int $fallback): int
+    {
+        $ttl = (int)$value;
+        return $ttl > 0 ? $ttl : $fallback;
+    }
 
     /**
      * 处理登录模式
