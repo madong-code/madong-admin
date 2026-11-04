@@ -33,6 +33,7 @@ declare(strict_types=1);
 namespace core\business\plugin;
 
 use core\business\plugin\traits\ConfigTrait;
+use core\business\plugin\traits\ProgressStreamTrait;
 use core\business\message\MessageDataSync;
 use core\business\plugin\traits\MigrationTrait;
 use core\business\plugin\traits\SeedTrait;
@@ -43,6 +44,7 @@ use core\business\plugin\traits\DependencyTransactionTrait;
 class PluginInstall
 {
     use ConfigTrait;
+    use ProgressStreamTrait;
     use MigrationTrait;
     use SeedTrait;
     use MenuTrait;

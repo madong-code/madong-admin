@@ -118,12 +118,24 @@ trait ProgressStreamTrait
     /**
      * 启动分离的后台进程（stdout/stderr 追加写入日志文件）
      *
+     * proc_open + bypass_shell：进程不附着父控制台（Windows 无新窗口），
+     * 输出重定向到文件、不继承管道，父进程退出不影响其存活。
+     *
+     * @param string      $command 命令行（Windows 下需要 cmd /c 包装 .cmd/.bat 程序）
+     * @param string      $logFile 日志文件（目录不存在时自动创建）
+     * @param string|null $cwd     工作目录（默认 backend 根目录）
+     *
      * @return resource|null 进程句柄
      */
-    protected function spawnDetachedProcess(string $command, string $logFile)
+    protected function spawnDetachedProcess(string $command, string $logFile, ?string $cwd = null)
     {
         if (!function_exists('proc_open')) {
             return null;
+        }
+
+        $logDir = dirname($logFile);
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0777, true);
         }
 
         $descriptors = [
@@ -133,7 +145,7 @@ trait ProgressStreamTrait
         ];
         $pipes = [];
 
-        $process = @proc_open($command, $descriptors, $pipes, base_path(), null, [
+        $process = @proc_open($command, $descriptors, $pipes, $cwd ?? base_path(), null, [
             'bypass_shell' => true,
         ]);
 

@@ -46,6 +46,23 @@ return [
         'admin'    => 'template/admin/src/plugin',
         // 前台模板目标路径（Nuxt3 插件目录为 src/plugin）
         'web'      => 'template/web/src/plugin',
+        // web dev server 端口（用于定位运行中的 dev server 进程）
+        'web_dev_port'           => 3000,
+        // 模板增删后是否自动重启 web dev server（无窗口静默重启）；
+        // 关闭后仅提示用户手动重启，避免 CI/生产等环境自动管理 node 进程
+        'restart_web_dev_server' => false,
+    ],
+
+    /**
+     * 隔离备份配置
+     * 安装/卸载时无法删除的残留模板目录统一隔离到 backend/runtime 下，
+     * 不再污染前端模板目录（历史 .trash-* 会在下次安装/卸载时一并清理）
+     */
+    'trash'        => [
+        // 隔离目录（相对于 backend/runtime）
+        'dir'  => 'install/plugin/trash',
+        // 每个插件保留的最近隔离份数（超出自动清理，0 表示全部保留）
+        'keep' => 3,
     ],
 
     /**

@@ -69,11 +69,11 @@ trait TemplateTrait
             @mkdir(dirname($targetDir), 0755, true);
         }
 
-        // 目标已存在（含 delete-pending 幽灵子目录）时先整体改名隔离腾出规范路径，
+        // 目标已存在（含 delete-pending 幽灵子目录）时先整体隔离到 runtime 腾出规范路径，
         // 再全新落盘——rename 不触碰子目录句柄，可绕开幽灵目录对 mkdir 的阻塞；
-        // 隔离目录由 purgeStaleTrashDirs 在下次安装/卸载时自动清理
+        // 隔离目录统一存放于 runtime/install/plugin/trash，由 purgeStaleTrashDirs 在下次安装/卸载时自动清理
         if (is_dir($targetDir)) {
-            if ($this->quarantineDir($targetDir)) {
+            if ($this->quarantineDir($targetDir, $endpoint)) {
                 $this->output("  ♻️ {$endpoint}: 旧模板目录已隔离，全新部署: {$targetDir}");
             } else {
                 // 改名失败（父目录被占用）时退回原策略：仅清理可移除的空/幽灵目录后合并复制
@@ -118,6 +118,16 @@ trait TemplateTrait
     protected function restartWebDevServer(string $endpoint): void
     {
         if ($endpoint !== 'web') {
+            return;
+        }
+
+        // 配置关闭时不自动管理 node 进程，仅提示手动重启
+        if (!$this->getConfig('template.restart_web_dev_server', true)) {
+            static $hinted = false;
+            if (!$hinted) {
+                $hinted = true;
+                $this->output('  ℹ️ web: restart_web_dev_server 已关闭，模板变更需手动重启 dev server 生效');
+            }
             return;
         }
 
@@ -175,21 +185,17 @@ trait TemplateTrait
 
     /**
      * 以分离进程拉起 web dev server（日志追加写入文件，不回显到当前终端）
+     *
+     * proc_open + bypass_shell：无窗口、不附着父控制台、不继承管道，
+     * stdout/stderr 重定向到日志文件，父进程退出不影响 dev server 存活。
      */
     protected function launchWebDevServerProcess(string $webRoot, string $logFile): void
     {
         if (PHP_OS_FAMILY === 'Windows') {
-            // 借助临时 bat 规避 start/cmd 多层引号转义问题；
-            // 必须经 WMI Win32_Process.Create 启动——由 WMI 服务代为创建的进程
-            // 彻底脱离调用方的 Job Object 与控制台生命周期：
-            // - start /B + popen/exec：子进程附着父控制台/继承管道，PHP 退出被连带终止或永久挂起
-            // - Start-Process：新隐藏控制台仍在调用方 Job Object 内，Job 关闭即被杀死
-            $bat = sys_get_temp_dir() . '/madong-web-dev-restart.bat';
-            @file_put_contents($bat, "@echo off\r\ncd /d \"{$webRoot}\"\r\nnpm run dev >> \"{$logFile}\" 2>&1\r\n");
-            $cmdLine = 'cmd.exe /c ""' . $bat . '""';
-            @exec('powershell -NoProfile -Command "Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = \'' . $cmdLine . '\' }"');
+            // CreateProcess 无法直接执行 npm.cmd，须经 cmd /c 包装
+            $this->spawnDetachedProcess('cmd /c npm run dev', $logFile, $webRoot);
         } else {
-            @popen('cd "' . $webRoot . '" && nohup npm run dev >> "' . $logFile . '" 2>&1 &', 'r');
+            $this->spawnDetachedProcess('npm run dev', $logFile, $webRoot);
         }
     }
 
@@ -305,9 +311,10 @@ trait TemplateTrait
     /**
      * 删除单个端模板
      *
-     * 删除失败（dev server 占用句柄）时尝试把残留目录改名隔离为
-     * 同级 .trash-{name}-<ts>，腾出规范路径，避免 delete-pending
-     * 幽灵目录阻塞下次安装；隔离目录在下次安装/卸载时自动清理。
+     * 删除失败（dev server 占用句柄）时尝试把残留目录隔离到
+     * runtime/install/plugin/trash/{name}_{端}_<ts>，腾出规范路径，
+     * 避免 delete-pending 幽灵目录阻塞下次安装；
+     * 隔离目录在下次安装/卸载时自动清理（仅保留最近 N 份）。
      */
     protected function deleteTemplateDir(string $endpoint): void
     {
@@ -359,7 +366,7 @@ trait TemplateTrait
 
         // 仍残留：改名隔离腾出规范路径；rename 在句柄释放的瞬间即可成功，故多次尝试
         for ($attempt = 0; $attempt < 3; $attempt++) {
-            if ($this->quarantineDir($targetDir)) {
+            if ($this->quarantineDir($targetDir, $endpoint)) {
                 $this->output("  ♻️ {$endpoint}: 残留模板目录已隔离，将在下次安装/卸载时自动清理");
                 $this->restartWebDevServer($endpoint);
                 return;
@@ -427,12 +434,13 @@ for ($i = 0; $i < 15; $i++) {
 }
 PHP;
 
-        // start /B 首个引号参数为窗口标题，须占位空标题；base64 以单引号包裹（PHP 字面量 + cmd 内字面量）
-        $cmd = 'start /B "" php -r "eval(base64_decode(\''
+        // proc_open + bypass_shell 分离进程（无窗口、不附着父控制台），输出写入日志文件
+        $logFile = base_path() . '/runtime/plugin-dir-cleanup.log';
+        $command = '"' . PHP_BINARY . '" -r "eval(base64_decode(\''
             . base64_encode($code)
             . '\'));" '
             . $payload;
-        @popen($cmd, 'r');
+        $this->spawnDetachedProcess($command, $logFile);
     }
 
     /**
@@ -458,22 +466,48 @@ PHP;
     }
 
     /**
-     * 把无法删除的残留目录改名隔离为同级 .trash-{name}-<ts>
+     * 把无法删除的残留目录隔离到 backend/runtime 统一备份目录
+     *
+     * 目标：{runtime}/install/plugin/trash/{name}_{端}_<ts>（不污染前端模板目录）。
+     * 优先 rename（同卷 O(1)，不触碰子目录句柄）；跨卷/句柄占用导致
+     * rename 失败时降级为递归复制到隔离目录，并尝试清理原目录。
      *
      * @return bool 隔离成功返回 true
      */
-    protected function quarantineDir(string $dir): bool
+    protected function quarantineDir(string $dir, string $endpoint = ''): bool
     {
         $name = $this->pluginName ?: 'plugin';
-        $target = dirname($dir) . DIRECTORY_SEPARATOR . '.trash-' . $name . '-' . date('YmdHis') . '-' . substr((string)mt_rand(), 0, 4);
+        $trashBase = runtime_path($this->getConfig('trash.dir', 'install/plugin/trash'));
+        if (!is_dir($trashBase) && !@mkdir($trashBase, 0755, true) && !is_dir($trashBase)) {
+            return false;
+        }
 
-        return @rename($dir, $target) && is_dir($target);
+        $target = $trashBase . DIRECTORY_SEPARATOR . $name
+            . ($endpoint !== '' ? '_' . $endpoint : '')
+            . '_' . date('YmdHis') . '-' . substr((string)mt_rand(), 0, 4);
+
+        if (@rename($dir, $target) && is_dir($target)) {
+            return true;
+        }
+
+        // rename 失败（跨卷/目录句柄被占用）：降级为复制，原目录交由既有删除链路兜底
+        if (!$this->recurseCopy($dir, $target) || !is_dir($target)) {
+            return false;
+        }
+
+        if (is_dir($dir)) {
+            $this->recurseDelete($dir, 1);
+        }
+
+        return true;
     }
 
     /**
-     * 清理历史遗留的隔离目录（.trash-{pluginName}-*）
+     * 清理历史遗留的隔离目录
      *
-     * 在每次安装/卸载模板操作前调用，句柄已释放时即可彻底清除。
+     * 在每次安装/卸载模板操作前调用：
+     * 1. 兼容清理旧版遗留在前端模板目录下的 .trash-{pluginName}-*（句柄已释放时即可彻底清除）；
+     * 2. 按 trash.keep 配置清理 runtime 隔离目录中该插件的旧备份（保留最近 N 份）。
      */
     protected function purgeStaleTrashDirs(): void
     {
@@ -482,6 +516,7 @@ PHP;
             return;
         }
 
+        // 旧版原地隔离产物（.trash-*），一次性兼容清理
         foreach (['admin', 'web'] as $endpoint) {
             $base = $this->getConfig("template.{$endpoint}");
             if (empty($base)) {
@@ -498,6 +533,30 @@ PHP;
                 if (!is_dir($trashDir)) {
                     $this->output("  🧹 Cleaned stale trash dir: {$trashDir}");
                 }
+            }
+        }
+
+        // runtime 隔离目录：按目录名（含时间戳）排序，仅保留最近 N 份
+        $keep = max(0, (int) $this->getConfig('trash.keep', 3));
+        if ($keep === 0) {
+            return;
+        }
+
+        $trashBase = runtime_path($this->getConfig('trash.dir', 'install/plugin/trash'));
+        if (!is_dir($trashBase)) {
+            return;
+        }
+
+        $trashDirs = glob($trashBase . '/' . $name . '_*', GLOB_ONLYDIR) ?: [];
+        if (count($trashDirs) <= $keep) {
+            return;
+        }
+
+        sort($trashDirs);
+        foreach (array_slice($trashDirs, 0, count($trashDirs) - $keep) as $trashDir) {
+            $this->recurseDelete($trashDir, 1);
+            if (!is_dir($trashDir)) {
+                $this->output("  🧹 Cleaned stale trash dir: {$trashDir}");
             }
         }
     }
