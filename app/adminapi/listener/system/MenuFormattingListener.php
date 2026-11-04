@@ -62,7 +62,6 @@ class MenuFormattingListener extends BaseListener
                 'name'      => $item->code ?: $self->menuNameFromPath($item->path),
                 'component' => $item->component,
                 'redirect'  => $item->redirect ?? '',
-
                 // 前端直接从根级别读取的字段
                 'icon'          => $item->icon ?? null,
                 'order'         => $item->sort ?? 0,
@@ -70,6 +69,13 @@ class MenuFormattingListener extends BaseListener
                 'disabled'      => false,          // 预留字段：是否禁用
                 'query'         => null,           // 预留字段：路由参数
             ];
+
+            // 顶层目录（type=1 且 pid=0）统一输出 vben 布局哨兵 BasicLayout：
+            // 插件安装菜单可能以 art 约定（/layout）或空值写入 DB，vben/aura 前端
+            // 仅识别 BasicLayout，不归一化会导致"一级菜单缺少 component"→ 登录后 500
+            if ((int) $item->type === 1 && (empty($item->pid) || (int) $item->pid === 0)) {
+                $result['component'] = 'BasicLayout';
+            }
 
             // 徽章配置（snake_case 输出，前端统一映射）
             if (!empty($item->show_text_badge)) {
