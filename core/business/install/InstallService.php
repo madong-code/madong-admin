@@ -79,9 +79,6 @@ final class InstallService
      */
     public function checkInstalled(): bool
     {
-        // 输出调试信息
-        echo "Checking for install.lock at: {$this->lock_file}\n";
-        echo "File exists: " . (file_exists($this->lock_file) ? "Yes" : "No") . "\n";
         return file_exists($this->lock_file);
     }
 
@@ -293,10 +290,18 @@ final class InstallService
                 yield from $this->initializeAdmin($dbParams, $adminParams, $sessionUuid);
             }
 
-            // 前端构建 (60-80%)
+            // 前端构建 (60-80%)：可选步骤，失败不影响数据库/配置/锁的安装结果
             if ($params['build_project'] == 1) {
                 yield Sse::progress('> 检查前端项目', 60, [], $sessionUuid);
-                yield from $this->processFrontendProjects($sessionUuid);
+                try {
+                    yield from $this->processFrontendProjects($sessionUuid);
+                } catch (Throwable $e) {
+                    yield Sse::warning(
+                        '前端构建/依赖安装失败，安装继续；可稍后在后台「终端 → 重新发布」中单独构建: ' . $e->getMessage(),
+                        [],
+                        $sessionUuid
+                    );
+                }
             }
 
             // 前端发布兜底 (80-85%)：无论是否构建、构建是否成功，
@@ -308,13 +313,20 @@ final class InstallService
             yield Sse::progress('> 6/6 创建.env配置文件', 90, [], $sessionUuid);
             $this->copyDatabaseTemplateAndCreateEnv($dbParams, $redisParams);
 
-            // 所有安装步骤成功后再写入锁，避免失败安装被标记为已完成
+            // 创建安装锁 (95-99%)：必须在 .env 之后，避免留下「已上锁但无密钥」的不可用状态
             yield Sse::progress('> 创建安装锁', 98, [], $sessionUuid);
             $this->createInstallLock();
 
             // 完成安装 (100%)
-           yield Sse::completed('安装完成', [], $sessionUuid);
-            Util::reloadWebman();
+            yield Sse::completed('安装完成', [], $sessionUuid);
+            // CLI 命令不在 Workerman 运行环境（Timer::add 会抛异常），仅 HTTP worker 中执行重载
+            if (!empty(\Workerman\Worker::getAllWorkers())) {
+                try {
+                    Util::reloadWebman();
+                } catch (Throwable $reloadError) {
+                    error_log('安装完成后的服务重载失败（不影响安装结果）: ' . $reloadError->getMessage());
+                }
+            }
             return;
         } catch (Throwable $e) {
             yield Sse::runtimeError($e->getMessage(), [], $sessionUuid);
@@ -1208,7 +1220,15 @@ final class InstallService
                     if (!is_dir($dir)) {
                         @mkdir($dir, 0755, true);
                     }
-                    @touch($v["path"]);
+                    // .env 必须从模板创建并立即生成随机 JWT 密钥：
+                    // 空文件会让修复后的 JwtToken fail-fast，且安装中途失败时无法自行恢复
+                    if ($v["name"] === 'env_file') {
+                        $template = $root_path . '/.example.env';
+                        $content  = file_exists($template) ? (string)file_get_contents($template) : "JWT_SECRET=\n";
+                        @file_put_contents($v["path"], \core\security\jwt\JwtSecret::ensureInEnv($content)['content']);
+                    } else {
+                        @touch($v["path"]);
+                    }
                 }
             } else {
                 // 目录不存在，尝试创建
@@ -1524,6 +1544,9 @@ final class InstallService
             'password' => $dbParams['redisPassword'] ?? $dbParams['redis_password'] ?? 'null',
         ]);
 
+        // 数据库连接测试阶段也会写 .env，同样保证密钥已生成，避免留下无密钥状态
+        $envContent = \core\security\jwt\JwtSecret::ensureInEnv($envContent)['content'];
+
         file_put_contents($envFile, $envContent);
     }
     
@@ -1538,7 +1561,7 @@ APP_DEBUG = false
 DB_CONNECTION = mysql
 DB_HOST = 127.0.0.1
 DB_PORT = 3306
-DB_DATABASE = md_admin
+DB_DATABASE = madong
 DB_USERNAME = root
 DB_PASSWORD = 
 DB_PREFIX = ma_
@@ -1552,6 +1575,13 @@ CACHE_DRIVER = redis
 SESSION_DRIVER = redis
 
 LOG_CHANNEL = daily
+
+# 事件循环：未安装 swow 扩展时留空回退同步模式
+APP_EVENT_LOOP =
+
+# 安装流程会通过 JwtSecret::ensureInEnv() 自动生成随机值，禁止填写固定示例密钥
+# 密钥块置于模板末尾，避免生成的 .env 把密钥顶在文件开头
+JWT_SECRET=
 ENV;
     }
 
@@ -1675,6 +1705,21 @@ ENV;
 
             // 替换 Redis 配置参数
             $envContent = $this->replaceEnvRedisParams($envContent, $redisParams);
+
+            // 保留已有合法密钥，避免 CLI 安装/重装轮换掉正在使用的 JWT_SECRET
+            $existingSecret = '';
+            if (file_exists($envFilePath)) {
+                $existingEnv = file_get_contents($envFilePath);
+                if ($existingEnv !== false && preg_match('/^JWT_SECRET=(.*)$/m', $existingEnv, $matches) === 1) {
+                    $existingSecret = trim($matches[1]);
+                }
+            }
+            if (\core\security\jwt\JwtSecret::isValid($existingSecret)) {
+                $envContent = preg_replace('/^JWT_SECRET=.*$/m', 'JWT_SECRET=' . $existingSecret, $envContent);
+            }
+
+            // 生成随机 JWT 签名密钥（禁止占位值/硬编码默认值）
+            $envContent = \core\security\jwt\JwtSecret::ensureInEnv((string)$envContent)['content'];
 
             // 写入.env文件
             if (file_put_contents($envFilePath, $envContent) === false) {

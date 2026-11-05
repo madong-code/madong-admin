@@ -94,7 +94,7 @@ class InstallCommand extends BaseCommand
             
             // 安装选项
             ->addOption('install-database', null, InputOption::VALUE_OPTIONAL, '是否安装数据库表（1=是，0=否）', '1')
-            ->addOption('build-project', null, InputOption::VALUE_OPTIONAL, '是否构建前端项目（1=是，0=否）', '1')
+            ->addOption('build-project', null, InputOption::VALUE_OPTIONAL, '是否构建前端项目（1=是，0=否；默认不构建，失败不影响安装）')
             ->addOption('non-interactive', 'y', InputOption::VALUE_NONE, '非交互模式（使用所有默认值）')
             ->addOption('skip-env-check', null, InputOption::VALUE_NONE, '跳过环境检查');
     }
@@ -113,7 +113,7 @@ class InstallCommand extends BaseCommand
             '欢迎使用 MDAdmin 框架安装程序！',
             '此程序将引导您完成框架的安装配置。',
             '',
-            '<comment>提示: 密码输入时不会显示字符(出于安全考虑)，输入完成后会显示确认信息</comment>',
+            '<comment>提示: 部分终端会回显密码明文，请注意环境安全；输入完成后会显示确认信息</comment>',
             '',
         ]);
 
@@ -124,9 +124,14 @@ class InstallCommand extends BaseCommand
             return Command::FAILURE;
         }
 
-        // 交互式或非交互式
-        $isInteractive = !$input->getOption('non-interactive');
+        // 交互式或非交互式：同时尊重 Symfony 的 --no-interaction / -n，
+        // 避免出现「以为在交互、实际所有问题都被跳过」的错觉
+        $isInteractive = !$input->getOption('non-interactive') && $input->isInteractive();
         $skipEnvCheck = $input->getOption('skip-env-check');
+
+        if (!$isInteractive) {
+            $io->note('非交互模式：不询问任何问题。默认数据库 madong、默认不构建前端；可用 --db-name、--build-project=1 等参数覆盖。');
+        }
 
         // 1. 环境检测
         if (!$skipEnvCheck) {
@@ -153,15 +158,26 @@ class InstallCommand extends BaseCommand
             // 调用安装服务（共享在线安装逻辑）
             $generator = $this->getInstallService()->install($installParams);
             
-            // 处理 SSE 事件输出
+            // 处理 SSE 事件输出：completed 不提前返回，让生成器执行完安装收尾动作
+            $completed = false;
             foreach ($generator as $chunk) {
                 $result = $this->handleSseEvent($chunk, $io, null);
-                if ($result !== null) {
-                    return $result;
+                if ($result === Command::FAILURE) {
+                    return Command::FAILURE;
+                }
+                if ($result === Command::SUCCESS) {
+                    $completed = true;
                 }
             }
-            
-            return Command::SUCCESS;
+
+            if ($completed) {
+                $io->note('CLI 安装不会自动重载 Webman 服务，请按部署方式重启后端后访问。');
+                if (($installParams['build_project'] ?? '0') !== '1') {
+                    $io->note('已跳过前端构建；如需更新前端资源，请在后台「终端 → 重新发布」中单独执行。');
+                }
+            }
+
+            return $completed ? Command::SUCCESS : Command::FAILURE;
         } catch (\Throwable $e) {
             $this->outputError($io, '安装失败: ' . $e->getMessage(), $e);
             return Command::FAILURE;
@@ -240,9 +256,9 @@ class InstallCommand extends BaseCommand
 
         $dbName = $input->getOption('db-name');
         if (!$dbName && $isInteractive) {
-            $dbName = $io->ask('请输入数据库名称', 'md_admin');
+            $dbName = $io->ask('请输入数据库名称', 'madong');
         }
-        $params['db_database'] = $dbName ?? 'md_admin';
+        $params['db_database'] = $dbName ?? 'madong';
 
         $dbUser = $input->getOption('db-user');
         if (!$dbUser && $isInteractive) {
@@ -252,7 +268,7 @@ class InstallCommand extends BaseCommand
 
         $dbPass = $input->getOption('db-pass');
         if (!$dbPass && $isInteractive) {
-            $io->text('提示: 密码输入时显示掩码字符 *');
+            $io->text('<comment>提示: 终端可能回显密码明文，请确认环境安全；输入完成后会显示确认信息</comment>');
             $dbPass = $this->askPassword($io, '请输入数据库密码: ');
             if ($dbPass !== '') {
                 $io->text('✓ 数据库密码已设置');
@@ -278,7 +294,7 @@ class InstallCommand extends BaseCommand
 
         $adminPassword = $input->getOption('admin-password');
         if (!$adminPassword && $isInteractive) {
-            $io->text('提示: 密码输入时显示掩码字符 *');
+            $io->text('<comment>提示: 终端可能回显密码明文，请确认环境安全；输入完成后会显示确认信息</comment>');
             do {
                 $adminPassword = $this->askPassword($io, '请输入管理员密码（至少6位）: ');
                 if (strlen($adminPassword) < 6) {
@@ -306,10 +322,12 @@ class InstallCommand extends BaseCommand
         $params['install_database'] = $installDatabase ?? '1';
 
         $buildProject = $input->getOption('build-project');
-        if ($buildProject === null && $isInteractive) {
-            $buildProject = $this->confirm($io, '是否构建前端项目？', false) ? '1' : '0';
+        if ($buildProject === null || $buildProject === '') {
+            $buildProject = $isInteractive
+                ? ($this->confirm($io, '是否构建前端项目？（耗时较长，失败不影响安装）', false) ? '1' : '0')
+                : '0';
         }
-        $params['build_project'] = $buildProject ?? '0';
+        $params['build_project'] = $buildProject === '1' ? '1' : '0';
 
         return $params;
     }
