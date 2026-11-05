@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd" bootstrap="tests/Bootstrap.php" colors="true" stopOnFailure="false" cacheResult="false">
   <testsuites>
-    <testsuite name="SaaS Test Suite">
-      <directory suffix=".php">tests/saas</directory>
+    <testsuite name="Standard Test Suite">
+      <directory suffix=".php">tests/security</directory>
       <directory suffix=".php">tests/integration</directory>
-      <directory suffix=".php">tests/portal</directory>
     </testsuite>
   </testsuites>
   <coverage/>

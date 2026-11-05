@@ -34,9 +34,19 @@ HANDOVER.md
 check-messages.php
 insert-test-message.php
 
-# 测试骨架占位（仅保留 Bootstrap.php）
-/tests/integration/
-/tests/saas/
+# 忽略 tests 目录下的临时产物，保留回归用例与脚手架
+tests/*
+!tests/.gitkeep
+!tests/Bootstrap.php
+!tests/support/
+!tests/support/TestJwtToken.php
+!tests/security/
+!tests/security/SecurityExportPathTest.php
+!tests/security/SecurityJwtSecretTest.php
+!tests/security/SecurityAdminAuthTest.php
+!tests/integration/
+!tests/integration/SecurityConfigTest.php
+!tests/integration/InstallCommandTest.php
 
 
 

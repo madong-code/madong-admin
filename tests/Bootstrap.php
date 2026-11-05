@@ -24,6 +24,16 @@ error_reporting($oldErrorReporting);
 defined('TESTING') || define('TESTING', true);
 defined('APP_DEBUG') || define('APP_DEBUG', true);
 
+// 安全回归用例不启动 Webman 容器：直接加载测试替身，并为无容器场景提供 config() 兜底
+require_once __DIR__ . '/support/TestJwtToken.php';
+
+if (!function_exists('config')) {
+    function config(string $key, mixed $default = null): mixed
+    {
+        return $default;
+    }
+}
+
 // 集成测试模式下才引导 Webman 容器
 if (!empty($_ENV['WFM_INTEGRATION']) || !empty(getenv('WFM_INTEGRATION'))) {
     $config = require __DIR__ . '/../support/bootstrap.php';
