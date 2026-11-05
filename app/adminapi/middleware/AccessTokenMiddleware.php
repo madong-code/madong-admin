@@ -51,18 +51,19 @@ final class AccessTokenMiddleware implements MiddlewareInterface
         }
 
         try {
-            $jwt    = new JwtToken();
-            $userId = $jwt->id();
-            if (empty($userId)) {
+            $jwt = new JwtToken();
+            // 仅信任「签名 + 黑名单 + 类型 + 用户存在 + JTI 注册」全部通过的 payload，
+            // 不再直接读取 getPayloadFromRequest() 中的身份声明
+            $payload = $jwt->getVerifiedPayload();
+            if (empty($payload) || (string)($payload['id'] ?? '') === '') {
                 throw new UnauthorizedHttpException();
             }
 
             // Playground 环境：按路由规则拦截（命中则抛异常，由下面 catch 统一处理）
             $this->checkPlaygroundRestriction($request);
 
-            // 从 JWT payload 中提取用户扩展信息
-            $payload = $jwt->getPayloadFromRequest();
-            $ext     = $payload['extra'] ?? $payload;
+            // 从已验证的 JWT payload 中提取用户扩展信息
+            $ext = $payload['extra'] ?? $payload;
         } catch (\Exception $e) {
             if (SseHelper::isSseRequest($request)) {
                 return SseHelper::sendSseErrorViaConnection($request, $e->getMessage());
