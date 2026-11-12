@@ -140,7 +140,7 @@ class Crud extends Base
             $id   = $request->route->param('id');
             $data = $this->service->get($id);
             if (empty($data)) {
-                throw new AdminException('数据未找到', 400);
+                throw new AdminException('数据未找到', ['statusCode' => 400]);
             }
             return Json::success('ok', $data->toArray());
         } catch (\Throwable $e) {
@@ -503,7 +503,8 @@ class Crud extends Base
                         if ($operatorUpper === 'LIKE') {
                             $result['filters'][$field] = "like:%{$value}%";
                         } elseif ($operatorUpper === 'IN' && is_array($value)) {
-                            $result['filters'][$field] = "in:" . json_encode($value);
+                            // QueryBuilderHelper 对 "in:" 字符串按逗号 explode，这里不使用 json_encode
+                            $result['filters'][$field] = 'in:' . implode(',', $value);
                         } else {
                             $result['filters'][$field] = "{$operator}:{$value}";
                         }
