@@ -186,7 +186,7 @@ final class DeptController extends Crud
                 ->whereNull('deleted_at')
                 ->orderBy('sort', 'asc')
                 ->orderBy('id', 'asc')
-                ->get(['id', 'pid', 'name', 'sort'])
+                ->get(['id', 'pid', 'name', 'code', 'sort'])
                 ->toArray();
 
             return Json::success('ok', $this->buildDeptTree($depts, '0'));
@@ -196,17 +196,19 @@ final class DeptController extends Crud
     }
 
     /**
-     * 组装部门树
+     * 组装部门树（根部门 pid 可能为 null 或 '0'，统一按 '0' 处理）
      */
     private function buildDeptTree(array $items, string $parentId = '0'): array
     {
         $tree = [];
         foreach ($items as $item) {
-            if ((string) $item['pid'] === $parentId) {
+            $nodePid = ($item['pid'] === null || $item['pid'] === '') ? '0' : (string) $item['pid'];
+            if ($nodePid === $parentId) {
                 $node = [
                     'id'   => (string) $item['id'],
-                    'pid'  => (string) $item['pid'],
+                    'pid'  => $nodePid,
                     'name' => $item['name'],
+                    'code' => $item['code'] ?? '',
                 ];
                 $children = $this->buildDeptTree($items, (string) $item['id']);
                 if (!empty($children)) {
