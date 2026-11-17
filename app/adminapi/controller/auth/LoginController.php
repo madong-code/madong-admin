@@ -18,6 +18,7 @@ use app\adminapi\controller\Crud;
 use app\adminapi\schema\request\auth\login\LoginRequest;
 use app\adminapi\schema\request\auth\ThirdPartyLoginRequest;
 use app\service\admin\system\admin\AdminService;
+use app\service\admin\system\config\ConfigService;
 use core\infrastructure\cache\CacheService;
 use core\security\captcha\Captcha;
 use core\foundation\exception\handler\AdminException;
@@ -235,6 +236,27 @@ final class LoginController extends Crud
             $userName  = $request->get('user_name');
             $data      = $this->service->thirdPartyLogin($acctId, $appId, $appSecret, $userName);
             return Json::success('登录成功', $data);
+        } catch (\Throwable $e) {
+            return Json::fail($e->getMessage());
+        }
+    }
+
+    #[OA\Get(
+        path: '/auth/site-info',
+        summary: '站点信息（登录前使用）',
+        description: '返回站点配置（group_code=default，code=site_setting），供登录页展示站点名称、Logo、Favicon。',
+        tags: ['无需授权'],
+    )]
+    #[SimpleResponse(schema: ['site_name' => 'madong', 'site_logo' => '/upload/logo.png', 'site_favicon' => '/favicon.ico', 'site_copyright' => 'Copyright 2024'], example: [])]
+    public function getSiteInfo(Request $request): \support\Response
+    {
+        try {
+            $configService = Container::get(ConfigService::class);
+            $siteInfo = $configService->config('site_setting', [], [
+                'group_code'       => 'default',
+                'with_upload_info' => true,
+            ]);
+            return Json::success('ok', is_array($siteInfo) ? $siteInfo : []);
         } catch (\Throwable $e) {
             return Json::fail($e->getMessage());
         }
