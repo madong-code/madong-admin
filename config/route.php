@@ -55,6 +55,7 @@ Route::get('/admin', function () {
     ]);
 })->middleware(CheckInstallMiddleware::class);
 
+
 /**
  * 后台静态资源路由
  * 访问路径: /admin/*
@@ -87,6 +88,16 @@ Route::any('/admin/[{path:.+}]', function (Request $request, $path = '') {
             ]);
         }
         return response('<h1>404 Not Found</h1>', 404);
+    }
+    // 优先返回构建期生成的 .gz 预压缩文件，避免每次请求重复压缩
+    $acceptEncoding = strtolower($request->header('accept-encoding', ''));
+    $gzFile = $file . '.gz';
+    if (str_contains($acceptEncoding, 'gzip') && is_file($gzFile)) {
+        $response = response('')->withFile($gzFile);
+        $response->header('Content-Type', $response->getMimeType(pathinfo($file, PATHINFO_EXTENSION)));
+        $response->header('Content-Encoding', 'gzip');
+        $response->header('Vary', 'Accept-Encoding');
+        return $response;
     }
     return response('')->withFile($file);
 });
