@@ -39,8 +39,11 @@ Route::get('/install', function () {
     ]);
 });
 
-// 站点首页
+// 站点首页：前端首页（web）已发布时跳转前端，未发布时回退后台管理
 Route::get('/', function () {
+    if (file_exists(public_path() . '/web/index.html')) {
+        return redirect('/web');
+    }
     return redirect('/admin');
 })->middleware(CheckInstallMiddleware::class);
 
