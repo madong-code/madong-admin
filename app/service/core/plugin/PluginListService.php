@@ -114,11 +114,27 @@ class PluginListService
             $moduleMap[$module['name']] = count($merged) - 1;
         }
 
-        // 再添加远程市场的插件（如果本地没有）
+        // 远程市场字段中需要同步到本地条目的展示类字段（不覆盖本地安装状态）
+        $marketFields = [
+            'title', 'purchased', 'price', 'cover', 'poster', 'description',
+            'detail_description', 'author', 'downloads', 'rating', 'category',
+            'category_name', 'tags', 'is_new', 'is_hot', 'update_time', 'update_logs',
+        ];
+
+        // 再处理远程市场的插件：本地已有则补齐市场字段，否则新增
         foreach ($purchasedModules as $module) {
-            if (!isset($moduleMap[$module['name']])) {
-                $merged[] = $module;
+            $name = $module['name'] ?? '';
+            if (isset($moduleMap[$name])) {
+                $idx = $moduleMap[$name];
+                foreach ($marketFields as $field) {
+                    if (array_key_exists($field, $module)) {
+                        $merged[$idx][$field] = $module[$field];
+                    }
+                }
+                continue;
             }
+            $moduleMap[$name] = count($merged);
+            $merged[]         = $module;
         }
 
         return $merged;
@@ -220,7 +236,9 @@ class PluginListService
      */
     private function buildModuleItem(?array $remoteModule, ?array $localModule, array $installedMap): array
     {
-        $name          = $remoteModule['name'] ?? $localModule['name'] ?? '';
+        // 官网 name/code 是插件标识，title 才是展示名；本地插件 name 本身即展示名
+        $code          = $remoteModule['code'] ?? $remoteModule['name'] ?? $localModule['name'] ?? '';
+        $name          = $remoteModule['title'] ?? $code;
         $isInstalled   = $localModule !== null;
         $localVersion  = $isInstalled ? $localModule['version'] : null;
         $remoteVersion = $remoteModule['version'] ?? null;
@@ -244,13 +262,14 @@ class PluginListService
 
         // 计算购买状态
         $isPurchased = $remoteModule
-            ? ($remoteModule['price'] == 0 || in_array($remoteModule['name'], self::FREE_PLUGINS))
+            ? ($remoteModule['price'] == 0 || in_array($code, self::FREE_PLUGINS))
             : false;
 
         return [
             'id'                    => $remoteModule['id'] ?? $localModule['name'] ?? '',
-            'code'                  => $remoteModule['code'] ?? $localModule['name'] ?? '',
+            'code'                  => $code,
             'name'                  => $name,
+            'icon'                  => $remoteModule['icon'] ?? $remoteModule['cover'] ?? '',
             'type'                  => $remoteModule['type'] ?? ($localModule['type'] ?? 'module'),
             'version'               => $remoteVersion ?? $localVersion ?? '',
             'status'                => $remoteModule['status'] ?? 1,
@@ -282,8 +301,8 @@ class PluginListService
             'installed_version'     => $localVersion,
             'has_update'            => (int)$hasUpdate,
             'is_purchased'          => (int)$isPurchased,
-            'is_downloaded'         => (int)($isInstalled || in_array($name, ['data-export'])),
-            'can_uninstall'         => (int)($isInstalled && $name !== 'user-management'),
+            'is_downloaded'         => (int)($isInstalled || in_array($code, ['data-export'])),
+            'can_uninstall'         => (int)($isInstalled && $code !== 'user-management'),
             'can_download'          => (int)$isPurchased,
             'is_local'              => (int)$isLocal,
             'undeletable'           => $undeletable,
