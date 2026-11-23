@@ -133,8 +133,11 @@ class PluginUninstallService extends PluginBaseService
                 @unlink($installedConfigPath);
             }
 
-            // 清理插件注册的任务与队列配置，避免 installed.php 删除后残留条目继续被调度
+            // 清理插件注册的 sys_crontab 定时任务（避免卸载后遗留条目导致调度器反复 QueryException）
+            yield Sse::progress('清理插件定时任务', 92, [], $sessionUuid);
             $this->purgePluginCrontab($code);
+
+            // 清理插件注册的 sys_redis_queue consumer 配置
             $this->purgePluginQueueConsumer($code);
 
             // 派发卸载后事件
@@ -237,10 +240,14 @@ class PluginUninstallService extends PluginBaseService
     }
 
     /**
-     * 卸载时清理 sys_crontab 里 source='plugin:{code}' 的所有条目（优先软删）。
+     * 卸载时清理 sys_crontab 里 source='plugin:{code}' 的所有条目（软删）。
      *
-     * 调度器每轮会扫描 enabled=1 的条目并反射调用 target；插件卸载后若条目残留，
-     * 每轮都会因目标类/表不存在而报错。软删保留审计链，无 deleted_at 字段时硬删兜底。
+     * 为什么必须做这步：
+     *   sys_crontab 调度器每轮会扫描 enabled=1 的条目反射调 target 类。
+     *   如果插件卸载但 crontab 条目遗留，每到触发时间都会 new $className() →
+     *   查不存在的插件表 → QueryException 被外层 catch 吞掉 → 下一轮继续炸。
+     *
+     * 软删优先（deleted_at 置位）保留审计链；硬删作为兜底（表无 deleted_at 字段时）。
      */
     protected function purgePluginCrontab(string $code): void
     {
@@ -276,8 +283,7 @@ class PluginUninstallService extends PluginBaseService
     }
 
     /**
-     * 卸载时防御性清理队列配置表中 source='plugin:{code}' 的条目。
-     * 当前框架无这些表时静默跳过，避免影响卸载主流程。
+     * 卸载时清理 sys_redis_queue 中插件注册的 consumer 配置（enabled=0 兜底）。
      */
     protected function purgePluginQueueConsumer(string $code): void
     {
