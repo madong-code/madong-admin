@@ -133,6 +133,10 @@ class PluginUninstallService extends PluginBaseService
                 @unlink($installedConfigPath);
             }
 
+            // 清理插件注册的任务与队列配置，避免 installed.php 删除后残留条目继续被调度
+            $this->purgePluginCrontab($code);
+            $this->purgePluginQueueConsumer($code);
+
             // 派发卸载后事件
             (new PluginUninstalled($code, $version))->dispatch();
 
@@ -229,6 +233,66 @@ class PluginUninstallService extends PluginBaseService
                 'plugin'    => $code,
                 'exception' => $e,
             ]);
+        }
+    }
+
+    /**
+     * 卸载时清理 sys_crontab 里 source='plugin:{code}' 的所有条目（优先软删）。
+     *
+     * 调度器每轮会扫描 enabled=1 的条目并反射调用 target；插件卸载后若条目残留，
+     * 每轮都会因目标类/表不存在而报错。软删保留审计链，无 deleted_at 字段时硬删兜底。
+     */
+    protected function purgePluginCrontab(string $code): void
+    {
+        $source = 'plugin:' . $code;
+        try {
+            $schema = \support\Db::connection()->getSchemaBuilder();
+            if (!$schema->hasTable('sys_crontab')) {
+                return;
+            }
+            $count = \support\Db::connection()->table('sys_crontab')
+                ->where('source', $source)
+                ->count();
+            if ($count === 0) {
+                return;
+            }
+            if ($schema->hasColumn('sys_crontab', 'deleted_at')) {
+                \support\Db::connection()->table('sys_crontab')
+                    ->where('source', $source)
+                    ->update([
+                        'enabled'    => 0,
+                        'deleted_at' => time(),
+                        'updated_at' => time(),
+                    ]);
+            } else {
+                \support\Db::connection()->table('sys_crontab')
+                    ->where('source', $source)
+                    ->delete();
+            }
+            \support\Log::info("plugin [{$code}] purged {$count} sys_crontab rows");
+        } catch (\Throwable $e) {
+            \support\Log::warning("plugin [{$code}] crontab purge failed: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * 卸载时防御性清理队列配置表中 source='plugin:{code}' 的条目。
+     * 当前框架无这些表时静默跳过，避免影响卸载主流程。
+     */
+    protected function purgePluginQueueConsumer(string $code): void
+    {
+        try {
+            $schema = \support\Db::connection()->getSchemaBuilder();
+            foreach (['sys_redis_queue', 'sys_queue_consumer'] as $table) {
+                if (!$schema->hasTable($table) || !$schema->hasColumn($table, 'source')) {
+                    continue;
+                }
+                \support\Db::connection()->table($table)
+                    ->where('source', 'plugin:' . $code)
+                    ->update(['enabled' => 0, 'updated_at' => time()]);
+            }
+        } catch (\Throwable $e) {
+            \support\Log::warning("plugin [{$code}] queue consumer purge failed: " . $e->getMessage());
         }
     }
 }
