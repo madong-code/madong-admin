@@ -137,58 +137,24 @@ class UploadService extends BaseService
     {
         $scene = $this->getScene();
         $mode  = UploadFile::config('upload', [], $scene)['mode'] ?? 'local';
-        $data   = file_get_contents($url);
-        if ($data === false) {
-            throw new AdminException('获取文件资源失败');
-        }
-        $image_resource = imagecreatefromstring($data);
-        if (!$image_resource) {
-            throw new AdminException('创建图片资源失败');
-        }
-        $filename       = basename($url);
-        $file_extension = pathinfo($filename, PATHINFO_EXTENSION);
-        $full_dir       = runtime_path() . '/resource/';
-        if (!is_dir($full_dir)) {
-            mkdir($full_dir, 0777, true);
-        }
-        $save_path    = $full_dir . $filename;
-        $content_type = 'image/';
-        switch ($file_extension) {
-            case 'jpg':
-            case 'jpeg':
-                $content_type = 'image/jpeg';
-                $result       = imagejpeg($image_resource, $save_path);
-                break;
-            case 'png':
-                $content_type = 'image/png';
-                $result       = imagepng($image_resource, $save_path);
-                break;
-            case 'gif':
-                $content_type = 'image/gif';
-                $result       = imagegif($image_resource, $save_path);
-                break;
-            case 'webp':
-                $content_type = 'image/webp';
-                $result       = imagewebp($image_resource, $save_path);
-                break;
-            default:
-                imagedestroy($image_resource);
-                throw new AdminException('文件格式错误');
-        }
-        imagedestroy($image_resource);
-        if (!$result) {
-            throw new AdminException('文件保存失败');
-        }
+
+        // SSRF 防护 + 远程拉取 + 临时文件落盘（core/io/network 单一入口）
+        $fetched = (new \core\io\network\RemoteImageFetcher())->fetchToTemp($url);
+        $save_path      = $fetched['path'];
+        $filename       = basename(parse_url($url, PHP_URL_PATH) ?: 'image');
+        $file_extension = $fetched['ext'];
+        $content_type   = $fetched['content_type'];
+        $size           = $fetched['size'];
+
         $hash   = md5_file($save_path);
-        $size   = filesize($save_path);
         // 存储空间标识（default=公开 / private=私有）
         $space = UploadFile::spaceMark($mode, $scene);
         // 去重：同一 hash + 同一存储平台 + 同一存储空间 + 同一来源才复用
         // （跨平台、跨空间、跨来源都不复用，避免插件与系统互相占用对方记录）
-        $result = $this->dao->get(['hash' => $hash, 'platform' => $mode, 'space' => $space, 'source' => $source]);
-        if (!empty($result)) {
+        $existing = $this->dao->get(['hash' => $hash, 'platform' => $mode, 'space' => $space, 'source' => $source]);
+        if (!empty($existing)) {
             unlink($save_path);
-            return $result->toArray();
+            return $existing->toArray();
         }
         // 交由存储适配器落盘（local/qiniu/oss/cos/s3），不再硬编码本地目录
         $options     = $subDir === '' ? [] : ['sub_dir' => trim($subDir, '/')];

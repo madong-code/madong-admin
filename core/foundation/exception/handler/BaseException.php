@@ -71,7 +71,13 @@ class BaseException extends \Exception
      */
     public function __construct(string $errorMessage = '', array $params = [], string $error = '')
     {
-        $errorMessage       = __($errorMessage ?: $this->errorMessage);// 翻译错误信息
+        // 翻译错误信息：CLI / 单元测试环境下 Laravel Translator 不可用，
+        // __() 会因空路径抛 TypeError，此时静默降级用原始消息
+        try {
+            $errorMessage = __($errorMessage ?: $this->errorMessage);
+        } catch (\Throwable) {
+            $errorMessage = $errorMessage ?: $this->errorMessage;
+        }
         $this->errorMessage = $errorMessage;
         $this->error        = $error;
         parent::__construct($errorMessage);

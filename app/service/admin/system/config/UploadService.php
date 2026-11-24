@@ -42,46 +42,15 @@ class UploadService extends BaseService
      */
     public function saveNetworkImage(string $url, string $subDir = ''): array
     {
-        $data   = file_get_contents($url);
-        if ($data === false) {
-            throw new AdminException('获取文件资源失败');
-        }
-        $image_resource = imagecreatefromstring($data);
-        if (!$image_resource) {
-            throw new AdminException('创建图片资源失败');
-        }
-        $filename       = basename($url);
-        $file_extension = pathinfo($filename, PATHINFO_EXTENSION);
-        $full_dir       = runtime_path() . '/resource/';
-        if (!is_dir($full_dir)) {
-            mkdir($full_dir, 0777, true);
-        }
-        $save_path    = $full_dir . $filename;
-        $content_type = 'image/';
-        switch ($file_extension) {
-            case 'jpg':
-            case 'jpeg':
-                $content_type = 'image/jpeg';
-                $result       = imagejpeg($image_resource, $save_path);
-                break;
-            case 'png':
-                $content_type = 'image/png';
-                $result       = imagepng($image_resource, $save_path);
-                break;
-            case 'gif':
-                $content_type = 'image/gif';
-                $result       = imagegif($image_resource, $save_path);
-                break;
-            default:
-                imagedestroy($image_resource);
-                throw new AdminException('文件格式错误');
-        }
-        imagedestroy($image_resource);
-        if (!$result) {
-            throw new AdminException('文件保存失败');
-        }
+        // SSRF 防护 + 远程拉取 + 临时文件落盘（core/io/network 单一入口）
+        $fetched = (new \core\io\network\RemoteImageFetcher())->fetchToTemp($url);
+        $save_path      = $fetched['path'];
+        $filename       = basename(parse_url($url, PHP_URL_PATH) ?: 'image');
+        $file_extension = $fetched['ext'];
+        $content_type   = $fetched['content_type'];
+        $size           = $fetched['size'];
+
         $hash = md5_file($save_path);
-        $size = filesize($save_path);
 
         $mode = UploadFile::config('upload')['mode'] ?? 'local';
         // 去重保持作用域：同一 hash + 同一存储平台 + 同一存储空间才复用，
