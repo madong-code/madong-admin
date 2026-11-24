@@ -30,9 +30,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *  - template/web  ：会员端
  *  - skills        ：技能模板（可选，-s 附加下载）
  *
- * 下载配置与 saas 版 config/install.php 的 download 段保持同构：
- *  - 默认 ZIP 归档下载，--method=git 可切回克隆
- *  - 默认 Gitee 国内镜像，缺失仓库按 fallback_mirrors 顺序回退
+ * 下载配置从 config/install.php 的 download 段读取（缺键回退类内默认值）：
+ *  - 默认 Git 克隆，下载后的模板保留 .git 远程连接；--method=zip 可切回归档下载
+ *  - 默认 GitHub 官方源且不自动回退镜像，--mirror=gitee/gitcode 可手动切换
  *  - admin 支持 single/aura 两种 UI 来源，均统一落到 template/admin
  *
  * 使用方法：
@@ -41,8 +41,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *   php webman madong-download:template -w          # 仅下载 web 模板
  *   php webman madong-download:template -s          # 额外下载 skills
  *   php webman madong-download:template --admin-variant=aura  # admin 来源选 aura，仍落到 template/admin
- *   php webman madong-download:template --mirror=gitee        # 切换下载源（默认 Github）
- *   php webman madong-download:template --method=git          # 切回 Git 克隆
+ *   php webman madong-download:template --mirror=gitee        # 切换下载源（默认 GitHub）
+ *   php webman madong-download:template --method=zip          # 切换为 ZIP 归档下载（不含 .git）
  *   php webman madong-download:template -b develop  # 指定分支
  *   php webman madong-download:template -f          # 目录已存在时强制更新
  *
@@ -65,16 +65,17 @@ class DownloadCommand extends BaseCommand
      */
     private array $downloadConfig = [
         'default_branch' => 'main',
-        // 默认 ZIP 归档下载，不依赖 Git 与本地代理；--method=git 可切回克隆
-        'method' => 'zip',
+        // 默认 Git 克隆，保留远程连接；--method=zip 可切换为归档下载
+        'method' => 'git',
         'archive_templates' => [
             'github.com'  => 'https://github.com/{path}/archive/refs/heads/{branch}.zip',
             'gitee.com'   => 'https://gitee.com/{path}/repository/archive/{branch}.zip',
             'gitcode.com' => 'https://gitcode.com/{path}/archive/{branch}.zip',
         ],
-        // 默认 GitHub；缺失的仓库按 fallback_mirrors 顺序回退
+        // 默认 GitHub，且默认不自动回退；可用 --mirror 手动切换
         'mirror' => 'github',
-        'fallback_mirrors' => ['gitee','gitcode'],
+        'fallback_enabled' => false,
+        'fallback_mirrors' => ['gitee', 'gitcode'],
         'mirrors' => [
             'github' => [
                 'label' => 'GitHub 官方源',
@@ -133,8 +134,8 @@ class DownloadCommand extends BaseCommand
             ->addOption('web', 'w', InputOption::VALUE_NONE, 'Download web template (template/web)')
             ->addOption('skills', 's', InputOption::VALUE_NONE, 'Additionally download skills template (skills/)')
             ->addOption('admin-variant', null, InputOption::VALUE_REQUIRED, 'Admin UI source: single/aura; both land in template/admin')
-            ->addOption('mirror', null, InputOption::VALUE_REQUIRED, 'Download source: gitee (default) / gitcode / github')
-            ->addOption('method', null, InputOption::VALUE_REQUIRED, 'Download method: zip (default) / git')
+            ->addOption('mirror', null, InputOption::VALUE_REQUIRED, 'Download source: github (default) / gitee / gitcode')
+            ->addOption('method', null, InputOption::VALUE_REQUIRED, 'Download method: git (default) / zip')
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Force update (overwrite existing)')
             ->addOption('branch', 'b', InputOption::VALUE_REQUIRED, 'Git branch to download', 'main');
     }
@@ -144,9 +145,9 @@ class DownloadCommand extends BaseCommand
         $io = new SymfonyStyle($input, $output);
         $io->title('Template Downloader');
 
-        $downloadConfig = $this->downloadConfig;
+        $downloadConfig = array_replace_recursive($this->downloadConfig, config('install.download', []));
 
-        // 下载方式：zip（默认）/ git
+        // 下载方式：git（默认）/ zip
         $method = $this->stringValue($input->getOption('method')) ?? $downloadConfig['method'];
         if ($method === 'git' && !$this->isGitAvailable()) {
             $io->error('Git is not available. Please install Git first.');
@@ -179,7 +180,7 @@ class DownloadCommand extends BaseCommand
             $projects = array_keys($downloadConfig['templates']);
         }
 
-        // 按镜像优先级合并仓库表：主镜像优先，缺失项由后备镜像补齐
+        // 镜像解析：默认只用主镜像；开启 fallback_enabled 后才用后备镜像补齐缺失仓库
         $mirrorName = $this->stringValue($input->getOption('mirror')) ?? $downloadConfig['mirror'];
         if (!isset($downloadConfig['mirrors'][$mirrorName])) {
             $io->warning("Unknown mirror '{$mirrorName}', fallback to '{$downloadConfig['mirror']}'");
@@ -188,10 +189,7 @@ class DownloadCommand extends BaseCommand
         $mirrorConfig = $downloadConfig['mirrors'][$mirrorName];
         $this->gitConfigOptions = !empty($mirrorConfig['no_proxy']) ? '-c http.proxy= -c https.proxy= ' : '';
 
-        $mirrorChain = array_values(array_unique(array_merge(
-            [$mirrorName],
-            $downloadConfig['fallback_mirrors']
-        )));
+        $mirrorChain = $this->resolveMirrorChain($mirrorName, $downloadConfig);
         $repositories = [];
         foreach (array_reverse($mirrorChain) as $candidateName) {
             $repositories = array_merge(
@@ -216,7 +214,7 @@ class DownloadCommand extends BaseCommand
         // 构建下载目标
         $targets = $this->buildTargets($rootDir, $projects, $repositories, $downloadConfig, $variant, (bool) $input->getOption('skills'), $io);
         if ($targets === []) {
-            $io->error('No download target available, check repositories in DownloadCommand');
+            $io->error('No download target available, check config/install.php download.mirrors');
             return Command::FAILURE;
         }
 
@@ -261,16 +259,21 @@ class DownloadCommand extends BaseCommand
                 continue;
             }
 
-            if (is_dir($targetDir)) {
-                if ($this->execGit("cd \"{$targetDir}\" && git pull origin {$branch}", $io)) {
+            if ($this->isUsableRepo($targetDir)) {
+                if ($this->execGit('cd ' . escapeshellarg($targetDir) . ' && git pull origin ' . escapeshellarg($branch), $io)) {
                     $io->success("Updated {$target['relative']}");
                     $success++;
                 }
                 continue;
             }
 
+            if (is_dir($targetDir)) {
+                $io->note("'{$target['relative']}' is not a usable Git repository (ZIP download or missing remote), re-cloning to restore remote");
+            }
+
             $io->info("Cloning {$target['name']}...");
-            if ($this->execGit("cd \"{$rootDir}\" && git clone -b {$branch} {$target['url']} {$target['relative']}", $io)) {
+            if ($this->cloneAndReplace($rootDir, $target, $branch, $io)) {
+                $this->patchDownloadedTemplate($targetDir, $target['repo_key']);
                 $io->success("Cloned to {$target['relative']}");
                 $success++;
             }
@@ -355,6 +358,20 @@ class DownloadCommand extends BaseCommand
     private function stringValue(mixed $value): ?string
     {
         return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
+     * 主镜像 + 受开关控制的后备镜像链
+     *
+     * @return string[]
+     */
+    private function resolveMirrorChain(string $mirrorName, array $downloadConfig): array
+    {
+        $chain = [$mirrorName];
+        if (empty($downloadConfig['fallback_enabled'])) {
+            return $chain;
+        }
+        return array_values(array_unique(array_merge($chain, $downloadConfig['fallback_mirrors'] ?? [])));
     }
 
     /**
@@ -559,11 +576,142 @@ JS);
     }
 
     /**
+     * 目标目录是否是带 origin 远程的有效 Git 仓库（ZIP 解压产物返回 false）
+     */
+    private function isUsableRepo(string $dir): bool
+    {
+        if (!is_dir($dir)) {
+            return false;
+        }
+
+        $gitCmd = 'git ' . $this->gitConfigOptions . '-C ' . escapeshellarg($dir);
+        $output = [];
+        exec($gitCmd . ' rev-parse --is-inside-work-tree 2>&1', $output, $returnVar);
+        if ($returnVar !== 0 || trim(implode("\n", $output)) !== 'true') {
+            return false;
+        }
+
+        $output = [];
+        exec($gitCmd . ' remote get-url origin 2>&1', $output, $returnVar);
+        return $returnVar === 0 && trim(implode("\n", $output)) !== '';
+    }
+
+    /**
+     * 先克隆到临时目录，再替换目标目录，避免半成品直接落在 template/ 下
+     *
+     * @param array{name:string,url:string,dir:string,relative:string,repo_key:string} $target
+     */
+    private function cloneAndReplace(string $rootDir, array $target, string $branch, SymfonyStyle $io): bool
+    {
+        $tmpRoot = $rootDir . DIRECTORY_SEPARATOR . '.template-tmp';
+        if (!is_dir($tmpRoot) && !mkdir($tmpRoot, 0755, true) && !is_dir($tmpRoot)) {
+            $io->error("Cannot create temporary directory: {$tmpRoot}");
+            return false;
+        }
+
+        $tmpName = basename(str_replace('\\', '/', $target['relative'])) . '-' . uniqid();
+        $tmpDir  = $tmpRoot . DIRECTORY_SEPARATOR . $tmpName;
+        $command = 'cd ' . escapeshellarg($tmpRoot)
+            . ' && git clone -b ' . escapeshellarg($branch)
+            . ' ' . escapeshellarg($target['url'])
+            . ' ' . escapeshellarg($tmpName);
+
+        if (!$this->execGit($command, $io) || !is_dir($tmpDir)) {
+            $io->error("Failed to clone {$target['name']}");
+            $this->removeDirectory($tmpDir);
+            return false;
+        }
+
+        // 等待杀毒软件/文件系统释放克隆目录句柄（最多 15 秒）
+        for ($i = 0; $i < 15 && !is_dir($tmpDir); $i++) {
+            sleep(1);
+        }
+
+        $parentDir = dirname($target['dir']);
+        if (!is_dir($parentDir) && !mkdir($parentDir, 0755, true) && !is_dir($parentDir)) {
+            $io->error("Cannot create directory: {$parentDir}");
+            $this->removeDirectory($tmpDir);
+            return false;
+        }
+
+        if (!$this->removeDirectory($target['dir'])) {
+            $io->error("Cannot remove old directory: {$target['relative']}");
+            $this->removeDirectory($tmpDir);
+            return false;
+        }
+
+        if (!@rename($tmpDir, $target['dir'])) {
+            if (!$this->copyDirectory($tmpDir, $target['dir'])) {
+                $io->error("Cannot move cloned directory to {$target['relative']}");
+                $this->removeDirectory($tmpDir);
+                return false;
+            }
+            $this->removeDirectory($tmpDir);
+        }
+        @rmdir($tmpRoot);
+
+        return true;
+    }
+
+    private function removeDirectory(string $dir): bool
+    {
+        if (!file_exists($dir)) {
+            return true;
+        }
+        if (is_file($dir) || is_link($dir)) {
+            return @unlink($dir);
+        }
+        if (!is_dir($dir)) {
+            return true;
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+        foreach ($iterator as $item) {
+            $path = $item->getPathname();
+            if ($item->isDir() && !$item->isLink()) {
+                @rmdir($path);
+            } else {
+                @unlink($path);
+            }
+        }
+        return @rmdir($dir);
+    }
+
+    private function copyDirectory(string $source, string $destination): bool
+    {
+        if (!is_dir($destination) && !mkdir($destination, 0755, true) && !is_dir($destination)) {
+            return false;
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($iterator as $item) {
+            $relative = substr($item->getPathname(), strlen($source) + 1);
+            $dest     = $destination . DIRECTORY_SEPARATOR . $relative;
+            if ($item->isDir()) {
+                if (!is_dir($dest) && !mkdir($dest, 0755, true) && !is_dir($dest)) {
+                    return false;
+                }
+            } elseif (!copy($item->getPathname(), $dest)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * 执行 Git 命令并输出结果
      */
     private function execGit(string $command, SymfonyStyle $io): bool
     {
-        $command = $this->gitConfigOptions . $command;
+        if ($this->gitConfigOptions !== '') {
+            $command = preg_replace('/\bgit /', 'git ' . $this->gitConfigOptions, $command) ?? $command;
+        }
         $io->text("> {$command}");
         $output = [];
         $returnVar = 0;
