@@ -68,7 +68,7 @@ class Local extends BaseUpload
                 'extension'   => $file->getUploadExtension(),
                 'base_path'   => $basePathUrl
             ];
-            $file->move($savePath);
+            $this->safeMove($file->getPathname(), $savePath);
             $result[] = $temp;
         }
         return $result;
@@ -114,6 +114,26 @@ class Local extends BaseUpload
             return false;
         }
         return mkdir($path, 0755, true);
+    }
+
+    /**
+     * 跨盘符安全移动文件
+     *
+     * Windows 下 rename() 不支持跨盘符移动（C: → D:），
+     * 先尝试 rename()，失败时降级为 copy() + unlink()。
+     */
+    protected function safeMove(string $source, string $target): void
+    {
+        // @ 抑制 PHP Warning（Webman 全局错误处理器会把 Warning 转 Exception，
+        // 导致 rename 跨盘符失败时还没来得及降级到 copy+unlink 就中断流程）
+        if (@rename($source, $target)) {
+            return;
+        }
+        // 跨盘符或其他 rename 失败场景 → copy + delete
+        if (!copy($source, $target)) {
+            throw new UploadException('文件拷贝失败: ' . $source . ' → ' . $target);
+        }
+        @unlink($source);
     }
 
     private function getRootPath(): string
