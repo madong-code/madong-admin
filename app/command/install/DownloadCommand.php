@@ -32,6 +32,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *
  * 下载配置从 config/install.php 的 download 段读取（缺键回退类内默认值）：
  *  - 默认 Git 克隆，下载后的模板保留 .git 远程连接；--method=zip 可切回归档下载
+ *  - 自动探测环境变量或 Windows 系统代理；国内镜像强制直连
  *  - 默认 GitHub 官方源且不自动回退镜像，--mirror=gitee/gitcode 可手动切换
  *  - admin 支持 single/aura 两种 UI 来源，均统一落到 template/admin
  *
@@ -127,6 +128,12 @@ class DownloadCommand extends BaseCommand
     /** 国内镜像直连时用于忽略本机失效代理的 git -c 参数 */
     private string $gitConfigOptions = '';
 
+    /** 探测到的代理地址（含协议），null 表示不使用代理 */
+    private ?string $proxyUrl = null;
+
+    /** 当前镜像是否要求绕过代理直连 */
+    private bool $noProxy = false;
+
     protected function configure(): void
     {
         $this
@@ -187,7 +194,17 @@ class DownloadCommand extends BaseCommand
             $mirrorName = $downloadConfig['mirror'];
         }
         $mirrorConfig = $downloadConfig['mirrors'][$mirrorName];
-        $this->gitConfigOptions = !empty($mirrorConfig['no_proxy']) ? '-c http.proxy= -c https.proxy= ' : '';
+        $this->noProxy = !empty($mirrorConfig['no_proxy']);
+        $this->proxyUrl = $this->noProxy ? null : $this->detectProxy();
+        if ($this->noProxy) {
+            $this->gitConfigOptions = '-c http.proxy= -c https.proxy= ';
+        } elseif ($this->proxyUrl !== null) {
+            $this->gitConfigOptions = '-c ' . escapeshellarg('http.proxy=' . $this->proxyUrl)
+                . ' -c ' . escapeshellarg('https.proxy=' . $this->proxyUrl) . ' ';
+            $io->text('Proxy: ' . $this->proxyUrl . ' (auto-detected)');
+        } else {
+            $this->gitConfigOptions = '';
+        }
 
         $mirrorChain = $this->resolveMirrorChain($mirrorName, $downloadConfig);
         $repositories = [];
@@ -355,6 +372,93 @@ class DownloadCommand extends BaseCommand
         return array_values($targets);
     }
 
+    /**
+     * 探测代理：显式环境变量优先，其次读取 Windows 系统代理（WinINET）
+     */
+    private function detectProxy(): ?string
+    {
+        foreach (['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy'] as $var) {
+            $value = getenv($var);
+            if (is_string($value) && $value !== '') {
+                return $this->normalizeProxy($value);
+            }
+        }
+
+        return PHP_OS_FAMILY === 'Windows' ? $this->readWindowsSystemProxy() : null;
+    }
+
+    /**
+     * 读取当前用户的 Windows 系统代理设置
+     */
+    private function readWindowsSystemProxy(): ?string
+    {
+        $key = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings';
+        $output = [];
+        $code = 0;
+
+        exec('reg query ' . escapeshellarg($key) . ' /v ProxyEnable 2>nul', $output, $code);
+        if ($code !== 0) {
+            return null;
+        }
+
+        $enabled = false;
+        foreach ($output as $line) {
+            if (preg_match('/ProxyEnable\s+REG_DWORD\s+0x([0-9a-f]+)/i', $line, $matches) === 1) {
+                $enabled = (int) hexdec($matches[1]) > 0;
+                break;
+            }
+        }
+        if (!$enabled) {
+            return null;
+        }
+
+        $output = [];
+        exec('reg query ' . escapeshellarg($key) . ' /v ProxyServer 2>nul', $output, $code);
+        if ($code !== 0) {
+            return null;
+        }
+        foreach ($output as $line) {
+            if (preg_match('/ProxyServer\s+REG_SZ\s+(.+)$/i', $line, $matches) === 1) {
+                return $this->normalizeProxy(trim($matches[1]));
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 归一化代理地址，兼容 "127.0.0.1:7890" 与 "http=...;https=..." 两种写法
+     */
+    private function normalizeProxy(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (str_contains($value, '=')) {
+            $addresses = [];
+            foreach (explode(';', $value) as $item) {
+                [$scheme, $address] = array_pad(explode('=', $item, 2), 2, '');
+                $addresses[strtolower(trim($scheme))] = trim($address);
+            }
+            $value = $addresses['https'] ?? $addresses['http'] ?? '';
+            if ($value === '') {
+                return null;
+            }
+        }
+
+        if (preg_match('#^https?://#i', $value) !== 1) {
+            $value = 'http://' . $value;
+        }
+        $parts = parse_url($value);
+        if (!is_array($parts) || empty($parts['host'])) {
+            return null;
+        }
+
+        return $value;
+    }
+
     private function stringValue(mixed $value): ?string
     {
         return is_string($value) && $value !== '' ? $value : null;
@@ -409,16 +513,25 @@ class DownloadCommand extends BaseCommand
         // 优先用 curl.exe：PHP 流包装器在部分 Windows 环境下无法访问 HTTPS
         $curlOutput = [];
         $curlCode = 1;
-        $curlCommand = 'curl.exe -L --fail --silent --show-error --max-time 300 -o '
+        $proxyArgs = '';
+        if ($this->noProxy) {
+            $proxyArgs = ' --noproxy "*"';
+        } elseif ($this->proxyUrl !== null) {
+            $proxyArgs = ' --proxy ' . escapeshellarg($this->proxyUrl);
+        }
+        $curlCommand = 'curl.exe -L --fail --silent --show-error --max-time 300' . $proxyArgs . ' -o '
             . escapeshellarg($tmpFile) . ' ' . escapeshellarg($url) . ' 2>&1';
         exec($curlCommand, $curlOutput, $curlCode);
         if ($curlCode !== 0 || !is_file($tmpFile) || filesize($tmpFile) === 0) {
-            $context = stream_context_create([
-                'http' => [
-                    'timeout' => 300,
-                    'header' => "User-Agent: madong-download\r\n",
-                ],
-            ]);
+            $httpOptions = [
+                'timeout' => 300,
+                'header' => "User-Agent: madong-download\r\n",
+            ];
+            if ($this->proxyUrl !== null && !$this->noProxy) {
+                $httpOptions['proxy'] = str_replace('http://', 'tcp://', $this->proxyUrl);
+                $httpOptions['request_fulluri'] = true;
+            }
+            $context = stream_context_create(['http' => $httpOptions]);
             $data = @file_get_contents($url, false, $context);
             if ($data === false || file_put_contents($tmpFile, $data) === false) {
                 @unlink($tmpFile);
